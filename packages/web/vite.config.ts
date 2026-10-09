@@ -30,8 +30,10 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      // Fall back to the next available port instead of failing when the
+      // configured development port is already occupied.
       port: ports.website,
-      strictPort: true,
+      strictPort: false,
       allowedHosts: true,
       hmr: { overlay: false },
       cors: false,
