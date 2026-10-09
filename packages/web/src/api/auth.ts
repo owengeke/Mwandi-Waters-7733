@@ -11,7 +11,9 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "sqlite" }),
   // Accounts are created by admins (staff) or provisioned on first OTP (clients) — no public sign-up.
   emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 8 },
-  secret: process.env.BETTER_AUTH_SECRET,
+  // Use a stable development-only secret so local preview sign-in can initialize.
+  // Set BETTER_AUTH_SECRET in production.
+  secret: process.env.BETTER_AUTH_SECRET ?? "mwandi-waters-local-development-secret",
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   rateLimit: { enabled: true, window: 60, max: 100 },
   user: {
