@@ -16,8 +16,8 @@ import {
  * (integer-cent math) so values are always rounded to 2 dp before storage.
  *
  * Tariff: flat KES 150 per consumption unit (m³). `invoices.amount_due_kes` is a
- * STORED generated column, so the database itself enforces
- *   amount_due_kes = round(consumption_units * 150, 2)
+ * Amount due is stored after being calculated by the API using the shared
+ * tariff helper. A regular column keeps SQLite schema synchronization safe.
  * Keep TARIFF_PER_UNIT_KES in lib/billing.ts in sync if this ever changes.
  */
 
@@ -108,10 +108,7 @@ export const invoices = sqliteTable(
     billingPeriodStart: text("billing_period_start").notNull(), // YYYY-MM-DD
     billingPeriodEnd: text("billing_period_end").notNull(), // YYYY-MM-DD
     consumptionUnits: numeric("consumption_units", { mode: "number" }).notNull(),
-    amountDueKes: numeric("amount_due_kes", { mode: "number" }).generatedAlwaysAs(
-      sql`round(consumption_units * 150, 2)`,
-      { mode: "stored" },
-    ),
+    amountDueKes: numeric("amount_due_kes", { mode: "number" }).notNull(),
     amountPaidKes: numeric("amount_paid_kes", { mode: "number" }).notNull().default(0),
     dueDate: text("due_date").notNull(), // YYYY-MM-DD
     status: text("status", { enum: INVOICE_STATUSES }).notNull().default("UNPAID"),

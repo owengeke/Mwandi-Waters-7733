@@ -50,7 +50,7 @@ export const invoices = {
     return row;
   }),
 
-  /** Issues an invoice. amount_due_kes is computed by the DB (units × 150). */
+  /** Issues an invoice using the shared tariff calculation. */
   create: operator
     .input(
       z
@@ -77,7 +77,10 @@ export const invoices = {
         throw new ORPCError("CONFLICT", { message: "Cannot bill a disconnected account" });
       }
       return db.transaction(async (tx) => {
-        const [row] = await tx.insert(t.invoices).values({ ...input, invoiceNumber: pending() }).returning();
+        const [row] = await tx
+          .insert(t.invoices)
+          .values({ ...input, amountDueKes: calcAmountDue(input.consumptionUnits), invoiceNumber: pending() })
+          .returning();
         const [final] = await tx
           .update(t.invoices)
           .set({ invoiceNumber: invoiceNumber(row.id) })

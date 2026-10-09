@@ -11,10 +11,10 @@
     "start": "bun src/__server.ts",
     "typecheck": "tsc --noEmit",
     "preview": "bun run build && vite preview",
-    "db:generate": "bun --env-file=../../.env drizzle-kit generate",
-    "db:migrate": "bun --env-file=../../.env drizzle-kit migrate",
-    "db:push": "bun --env-file=../../.env drizzle-kit push",
-    "db:seed": "bun --env-file=../../.env src/api/database/seed.ts"
+    "db:generate": "bun --env-file-if-exists=../../.env.development.local drizzle-kit generate",
+    "db:migrate": "bun --env-file-if-exists=../../.env.development.local drizzle-kit migrate",
+    "db:push": "bun --env-file-if-exists=../../.env.development.local drizzle-kit push",
+    "db:seed": "bun --env-file-if-exists=../../.env.development.local src/api/database/seed.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.19",
