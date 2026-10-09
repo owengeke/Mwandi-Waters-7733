@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-display: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #fafcff;
+  --foreground: #0b1b2e;
+  --card: #ffffff;
+  --card-foreground: #0b1b2e;
+  --popover: #ffffff;
+  --popover-foreground: #0b1b2e;
+  --primary: #0077b6;
+  --primary-foreground: #ffffff;
+  --secondary: #eef4fa;
+  --secondary-foreground: #0b1b2e;
+  --muted: #eef4fa;
+  --muted-foreground: #5b6b7f;
+  --accent: #e3f2fb;
+  --accent-foreground: #005a8a;
+  --destructive: #c62828;
+  --success: #12805c;
+  --warning: #b45309;
+  --border: #dce6f0;
+  --input: #cfdbe7;
+  --ring: #0077b6;
+  --chart-1: #0077b6;
+  --chart-2: #00a6c8;
+  --chart-3: #12805c;
+  --chart-4: #b45309;
+  --chart-5: #5b6b7f;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b1b2e;
+  --sidebar-primary: #0077b6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3f2fb;
+  --sidebar-accent-foreground: #005a8a;
+  --sidebar-border: #dce6f0;
+  --sidebar-ring: #0077b6;
+  --contour: rgba(0, 119, 182, 0.06);
+}
+
+.dark {
+  --background: #0b132b;
+  --foreground: #e6eef7;
+  --card: #1e293b;
+  --card-foreground: #e6eef7;
+  --popover: #1e293b;
+  --popover-foreground: #e6eef7;
+  --primary: #3ba4e0;
+  --primary-foreground: #06101f;
+  --secondary: #16213a;
+  --secondary-foreground: #e6eef7;
+  --muted: #16213a;
+  --muted-foreground: #94a3b8;
+  --accent: #173252;
+  --accent-foreground: #9fd4f3;
+  --destructive: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --border: #2a3a52;
+  --input: #334763;
+  --ring: #3ba4e0;
+  --chart-1: #3ba4e0;
+  --chart-2: #22d3ee;
+  --chart-3: #34d399;
+  --chart-4: #fbbf24;
+  --chart-5: #94a3b8;
+  --sidebar: #111b33;
+  --sidebar-foreground: #e6eef7;
+  --sidebar-primary: #3ba4e0;
+  --sidebar-primary-foreground: #06101f;
+  --sidebar-accent: #173252;
+  --sidebar-accent-foreground: #9fd4f3;
+  --sidebar-border: #22314a;
+  --sidebar-ring: #3ba4e0;
+  --contour: rgba(59, 164, 224, 0.05);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    background-image:
+      repeating-radial-gradient(circle at 100% 0%, transparent 0 38px, var(--contour) 38px 39px),
+      none;
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+    letter-spacing: -0.02em;
+  }
+  input, select, textarea, button {
+    @apply font-sans;
+  }
+}
+
+/* Smooth colour change when toggling theme (not on first paint). */
+.theme-transition,
+.theme-transition * {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, fill 200ms ease !important;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
+}
