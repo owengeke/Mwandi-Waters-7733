@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit && vite build",
-    "dev": "vite",
+    "dev": "bun run db:push && vite",
     "start": "bun src/__server.ts",
     "typecheck": "tsc --noEmit",
     "preview": "bun run build && vite preview",

@@ -5,7 +5,7 @@ export default defineConfig({
   schema: "./src/api/database/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_URL ?? "file:./local.db",
     authToken: process.env.DATABASE_AUTH_TOKEN,
   },
 });
