@@ -4,7 +4,7 @@
  * One identifier field accepts Email, Phone (07…/+254…) or Account Number (ACC-XXXX).
  * Two secrets:
  *   POST /api/auth/portal/sign-in     { identifier, password }
- *   POST /api/auth/portal/otp/send    { identifier }            → SMS 6-digit code to the phone on file
+ *   POST /api/auth/portal/otp/send    { identifier }            → 6-digit code over WhatsApp (SMS fallback)
  *   POST /api/auth/portal/otp/verify  { identifier, code }
  * Success sets the session cookie and (via bearer()) the `set-auth-token` header.
  *
@@ -19,7 +19,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import type { BetterAuthPlugin } from "better-auth";
 import { db } from "../database";
 import { clients, user as userTable } from "../database/schema";
-import { sendSms, smsConfigured } from "./sms";
+import { deliverOtp, otpDeliveryConfigured, type DeliveryChannel } from "./notify";
 
 const OTP_TTL_SEC = 300;
 const OTP_MAX_ATTEMPTS = 5;
@@ -115,7 +115,7 @@ export const portalAuth = () =>
 
           const phone = user?.phoneNumber ?? client?.phoneNumber;
           // Same response shape whether or not the identifier exists (no account enumeration).
-          if (!user || !phone) return ctx.json({ sent: true, destination: null, expiresIn: OTP_TTL_SEC });
+          if (!user || !phone) return ctx.json({ sent: true, channel: null, destination: null, expiresIn: OTP_TTL_SEC });
 
           const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
           const salt = crypto.randomUUID();
@@ -125,11 +125,22 @@ export const portalAuth = () =>
             value: JSON.stringify({ h: hash(code, salt), s: salt, a: 0 }),
             expiresAt: new Date(Date.now() + OTP_TTL_SEC * 1000),
           });
-          await sendSms(phone, `Your Mwandi Waters sign-in code is ${code}. It expires in 5 minutes. Do not share it.`);
 
-          const exposeCode = !smsConfigured() && process.env.NODE_ENV !== "production";
+          let channel: DeliveryChannel;
+          try {
+            ({ channel } = await deliverOtp(phone, code));
+          } catch (error) {
+            await ctx.context.internalAdapter.deleteVerificationByIdentifier(otpKey(user.id));
+            console.error("[portal] could not deliver sign-in code", error);
+            throw new APIError("INTERNAL_SERVER_ERROR", {
+              message: "We couldn't send your sign-in code. Please try again.",
+            });
+          }
+
+          const exposeCode = !otpDeliveryConfigured() && process.env.NODE_ENV !== "production";
           return ctx.json({
             sent: true,
+            channel,
             destination: maskPhone(phone),
             expiresIn: OTP_TTL_SEC,
             ...(exposeCode ? { devCode: code } : {}),

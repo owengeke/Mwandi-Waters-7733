@@ -193,14 +193,20 @@ export const Login = function Login() {
                 <div className="rounded-xl border border-primary/20 bg-primary/8 px-3.5 py-3 text-sm">
                   {otp.destination ? (
                     <p className="text-foreground">
-                      We sent a 6-digit code to <span className="font-mono font-semibold">{otp.destination}</span>. It expires in {Math.round(otp.expiresIn / 60)} minutes.
+                      We sent a 6-digit code to <span className="font-mono font-semibold">{otp.destination}</span>
+                      {otp.channel === "whatsapp"
+                        ? " on WhatsApp"
+                        : otp.channel === "sms"
+                          ? " by SMS"
+                          : ""}
+                      . It expires in {Math.round(otp.expiresIn / 60)} minutes.
                     </p>
                   ) : (
                     <p className="text-foreground">If that account exists, a 6-digit code is on its way to the registered phone.</p>
                   )}
                   {otp.devCode && (
                     <p className="mt-1.5 text-xs text-muted-foreground">
-                      Dev mode, SMS not configured. Code: <span className="font-mono font-semibold text-foreground">{otp.devCode}</span>
+                      Dev mode, no delivery channel configured. Code: <span className="font-mono font-semibold text-foreground">{otp.devCode}</span>
                     </p>
                   )}
                 </div>

@@ -38,7 +38,15 @@ export const authClient = createAuthClient({
 
 export type PortalUser = { id: string; name: string; role: string };
 type PortalResult = { token: string; user: PortalUser };
-export type OtpSendResult = { sent: boolean; destination: string | null; expiresIn: number; devCode?: string };
+export type OtpChannel = "whatsapp" | "sms" | "console";
+export type OtpSendResult = {
+  sent: boolean;
+  /** How the code was delivered; null when the identifier is unknown. */
+  channel?: OtpChannel | null;
+  destination: string | null;
+  expiresIn: number;
+  devCode?: string;
+};
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const { data, error } = await authClient.$fetch<T>(path, { method: "POST", body: body as Record<string, unknown> });
