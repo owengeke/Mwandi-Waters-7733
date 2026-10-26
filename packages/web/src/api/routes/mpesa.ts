@@ -154,14 +154,14 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /**
- * GET /api/receipts/:paymentId — PDF receipt.
+ * GET /api/receipts/:paymentId.pdf — PDF receipt (the extension is optional).
  * Clients may only download their own receipts; operators may download any.
  */
 export async function receiptPdf(c: Context) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Sign in required" }, 401);
 
-  const paymentId = Number(c.req.param("paymentId"));
+  const paymentId = Number((c.req.param("paymentId") ?? "").replace(/\.pdf$/i, ""));
   if (!Number.isInteger(paymentId) || paymentId <= 0) return c.json({ error: "Receipt not found" }, 404);
 
   const [row] = await db

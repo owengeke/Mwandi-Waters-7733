@@ -1,120 +1,186 @@
-import { useLocation } from "wouter";
-import { Gauge, LogOut, ReceiptText, Wallet } from "lucide-react";
-import { BrandMark } from "../components/app-shell";
-import { ThemeToggle } from "../components/theme-switcher";
-import { StatCard } from "../components/stat-card";
-import { StatusBadge } from "../components/status-badge";
-import { DataTable, type Column } from "../components/data-table";
+import { useCallback, useState } from "react";
+import { ArrowUpRight, RefreshCw, ReceiptText } from "lucide-react";
+import type { Invoice } from "../../api/database/schema";
+import { ClientShell } from "../components/client-shell";
 import { Code } from "../components/code";
-import { useAccountOverview } from "../queries/account";
-import { useMe, useSignOut } from "../queries/portal";
-import { channelLabel, formatDate, formatKES, formatUnits } from "../lib/format";
-
-type Overview = NonNullable<ReturnType<typeof useAccountOverview>["data"]>;
-type InvoiceRow = Overview["invoices"][number];
-type PaymentRow = Overview["payments"][number];
-
-const invoiceCols: Column<InvoiceRow>[] = [
-  { key: "no", header: "Invoice", cell: (r) => <Code>{r.invoiceNumber}</Code> },
-  { key: "period", header: "Period", cell: (r) => <span className="text-muted-foreground">{formatDate(r.billingPeriodStart)} – {formatDate(r.billingPeriodEnd)}</span> },
-  { key: "units", header: "Units", align: "right", cell: (r) => <span className="tabular-nums">{formatUnits(r.consumptionUnits)}</span> },
-  { key: "due", header: "Amount", align: "right", cell: (r) => <span className="font-semibold">{formatKES(r.amountDueKes)}</span> },
-  { key: "dueDate", header: "Due", cell: (r) => <span className="text-muted-foreground">{formatDate(r.dueDate)}</span> },
-  { key: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
-];
-
-const paymentCols: Column<PaymentRow>[] = [
-  { key: "receipt", header: "Receipt", cell: (r) => <Code>{r.mpesaReceiptNumber ?? "—"}</Code> },
-  { key: "channel", header: "Channel", cell: (r) => <span className="text-muted-foreground">{channelLabel(r.paymentChannel)}</span> },
-  { key: "date", header: "Date", cell: (r) => <span className="text-muted-foreground">{formatDate(r.paymentDate)}</span> },
-  { key: "amt", header: "Amount", align: "right", cell: (r) => <span className="font-semibold">{formatKES(r.amountPaidKes)}</span> },
-];
+import { BalanceCard, OpenInvoicesCard } from "../components/client/billing-summary";
+import { BillsCard } from "../components/client/bills-card";
+import { PaymentsCard } from "../components/client/payments-card";
+import { UsageCard } from "../components/client/usage-card";
+import { AccountDetailsCard } from "../components/client/account-details-card";
+import { PaymentDialog } from "../components/client/payment-dialog";
+import { DemoBadge, Section } from "../components/client/section";
+import { useAccountOverview, outstandingKes } from "../queries/account";
+import { useMe } from "../queries/portal";
+import { formatKES, formatUnits } from "../lib/format";
 
 export const Dashboard = function Dashboard() {
   const me = useMe();
   const overview = useAccountOverview();
-  const signOut = useSignOut();
-  const [, navigate] = useLocation();
-  const c = overview.data?.client;
-  const latest = overview.data?.invoices[0];
-  const balance = c?.currentBalanceKes ?? 0;
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [payTarget, setPayTarget] = useState<Invoice | null>(null);
+
+  const client = overview.data?.client;
+  const invoices = overview.data?.invoices ?? [];
+  const payments = overview.data?.payments ?? [];
+  const mpesa = overview.data?.mpesa ?? { demoMode: true, paybill: "" };
+  const openInvoices = invoices.filter((invoice) => outstandingKes(invoice) > 0);
+  const firstName = (client?.fullName ?? me.data?.name ?? "there").split(/\s+/)[0];
+
+  const refetch = overview.refetch;
+  const onPaid = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
+  const openPayment = (invoice?: Invoice) => {
+    setPayTarget(invoice ?? openInvoices[0] ?? null);
+    setDialogOpen(true);
+  };
+
+  const closePayment = () => {
+    setDialogOpen(false);
+    // A late callback may have landed while the dialog was open.
+    void refetch();
+  };
 
   return (
-    <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-5 md:px-8">
-          <div className="flex items-center gap-2.5">
-            <BrandMark className="size-8" />
-            <span className="font-display text-[17px] font-bold tracking-tight">Mwandi Waters</span>
+    <ClientShell status={client?.status}>
+      <div className="space-y-10 md:space-y-12">
+        <header className="rise flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+              Your water account
+            </p>
+            <h1 className="font-display text-2xl font-bold tracking-tight md:text-3xl">Habari, {firstName}.</h1>
+            {client ? (
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                <span>
+                  Account <Code className="text-primary">{client.accountNumber}</Code>
+                </span>
+                <span className="hidden h-3 w-px bg-border sm:block" aria-hidden />
+                <span>
+                  Meter <Code>{client.meterNumber}</Code>
+                </span>
+                <span className="hidden h-3 w-px bg-border sm:block" aria-hidden />
+                <span>{formatUnits(invoices[0]?.consumptionUnits ?? 0)} units last period</span>
+              </p>
+            ) : (
+              <div className="mt-3 h-4 w-64 animate-pulse rounded bg-muted" />
+            )}
           </div>
+
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            {mpesa.demoMode && <DemoBadge className="hidden sm:inline-flex" />}
             <button
               type="button"
-              disabled={signOut.isPending}
-              onClick={() => signOut.mutate(undefined, { onSettled: () => navigate("/login", { replace: true }) })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-semibold hover:bg-muted disabled:opacity-60"
+              onClick={() => refetch()}
+              aria-label="Refresh account"
+              title="Refresh account"
+              className="inline-flex size-10 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <LogOut className="size-4" /> Sign out
+              <RefreshCw className={`size-4 ${overview.isFetching ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => openPayment()}
+              disabled={openInvoices.length === 0}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Pay bill
+              <ArrowUpRight className="size-4" />
             </button>
           </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1100px] px-5 py-8 md:px-8 md:py-10">
-        <header className="rise mb-8">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">My account</p>
-          <h1 className="text-3xl font-bold">Habari, {(c?.fullName ?? me.data?.name ?? "").split(" ")[0]}</h1>
-          {c && (
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>Account <Code className="text-primary">{c.accountNumber}</Code></span>
-              <span>Meter <Code>{c.meterNumber}</Code></span>
-              <StatusBadge status={c.status} />
-            </p>
-          )}
         </header>
 
         {overview.error ? (
-          <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">{overview.error.message}</div>
+          <div className="rounded-xl border border-destructive/25 bg-card p-6" role="alert">
+            <p className="text-sm font-semibold text-destructive">We couldn&rsquo;t load your account.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {overview.error instanceof Error ? overview.error.message : "Please try again in a moment."}
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-semibold hover:bg-muted"
+            >
+              <RefreshCw className="size-3.5" />
+              Try again
+            </button>
+          </div>
         ) : (
           <>
-            <section className="mb-10 grid gap-4 sm:grid-cols-3">
-              <StatCard
-                index={0}
-                emphasis
-                label={balance < 0 ? "Credit on account" : "Balance due"}
-                icon={<Wallet className="size-4" />}
-                loading={overview.isLoading}
-                value={formatKES(Math.abs(balance))}
-                caption={balance > 0 ? "Pay via M-Pesa Paybill 522 533" : "You're all settled"}
-              />
-              <StatCard
-                index={1}
-                label="Last bill"
-                icon={<ReceiptText className="size-4" />}
-                loading={overview.isLoading}
-                value={latest ? formatKES(latest.amountDueKes) : "—"}
-                caption={latest ? `Due ${formatDate(latest.dueDate)}` : "No bills yet"}
-              />
-              <StatCard
-                index={2}
-                label="Last reading"
-                icon={<Gauge className="size-4" />}
-                loading={overview.isLoading}
-                value={latest ? `${formatUnits(latest.consumptionUnits)} units` : "—"}
-                caption={latest ? `Period ending ${formatDate(latest.billingPeriodEnd)}` : "Tariff KES 150 / unit"}
-              />
+            <section id="overview" aria-labelledby="overview-title" className="scroll-mt-24">
+              <h2 id="overview-title" className="sr-only">
+                Overview
+              </h2>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <BalanceCard client={client} invoices={invoices} loading={overview.isLoading} onPay={openPayment} />
+                </div>
+                <OpenInvoicesCard invoices={invoices} loading={overview.isLoading} onPay={openPayment} />
+              </div>
             </section>
 
-            <h2 className="mb-3 text-lg font-bold">Bills</h2>
-            <DataTable columns={invoiceCols} rows={overview.data?.invoices} loading={overview.isLoading} rowKey={(r) => r.id} empty="No bills yet." />
+            <Section
+              id="bills"
+              title="Bills"
+              description="Every statement on your account, newest first. Pay any outstanding balance with M-Pesa."
+              action={
+                openInvoices.length > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive">
+                    <ReceiptText className="size-3.5" />
+                    {formatKES(openInvoices.reduce((sum, invoice) => sum + outstandingKes(invoice), 0))} outstanding
+                  </span>
+                ) : undefined
+              }
+            >
+              <BillsCard
+                invoices={invoices}
+                loading={overview.isLoading}
+                error={overview.error}
+                onPay={openPayment}
+              />
+            </Section>
 
-            <h2 className="mb-3 mt-10 text-lg font-bold">Payments</h2>
-            <DataTable columns={paymentCols} rows={overview.data?.payments} loading={overview.isLoading} rowKey={(r) => r.id} empty="No payments recorded yet." />
+            <Section
+              id="payments"
+              title="Payments"
+              description="M-Pesa receipts are available as PDFs for your records."
+            >
+              <PaymentsCard
+                payments={payments}
+                invoices={invoices}
+                loading={overview.isLoading}
+                error={overview.error}
+              />
+            </Section>
+
+            <Section id="usage" title="Usage" description="See how much water your household used each month.">
+              <UsageCard invoices={invoices} loading={overview.isLoading} />
+            </Section>
+
+            <Section id="account" title="Account" description="Your service details and the easiest way to pay.">
+              <AccountDetailsCard
+                client={client}
+                loading={overview.isLoading}
+                demoMode={mpesa.demoMode}
+                paybill={mpesa.paybill}
+              />
+            </Section>
           </>
         )}
-      </main>
-    </div>
+      </div>
+
+      <PaymentDialog
+        open={dialogOpen}
+        onClose={closePayment}
+        onPaid={onPaid}
+        initialInvoice={payTarget}
+        invoices={invoices}
+        client={client}
+        mpesa={mpesa}
+      />
+    </ClientShell>
   );
 };
 

@@ -27,7 +27,7 @@ export function Modal({ open, onClose, title, description, children, className }
       onCancel={onClose}
       aria-labelledby="modal-title"
       className={cn(
-        "m-auto w-[min(560px,calc(100vw-2rem))] rounded-2xl border bg-card p-0 text-card-foreground shadow-2xl",
+        "m-auto max-h-[calc(100dvh-2rem)] w-[min(560px,calc(100vw-2rem))] overflow-y-auto rounded-2xl border bg-card p-0 text-card-foreground shadow-2xl",
         "backdrop:bg-[#0B132B]/55 backdrop:backdrop-blur-sm open:animate-in open:fade-in-0 open:zoom-in-95",
         className,
       )}
