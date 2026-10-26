@@ -9,6 +9,7 @@ import { installations } from "./routes/installations";
 import { clients } from "./routes/clients";
 import { invoices } from "./routes/invoices";
 import { payments } from "./routes/payments";
+import { mpesaCallback, receiptPdf } from "./routes/mpesa";
 
 // Mwandi Waters API — oRPC procedures served at /api/rpc/*
 //   portal  → public (landing page) + session info
@@ -32,5 +33,8 @@ export type AppRouterClient = RouterClient<AppRouter>;
 const app = createApp(router);
 // Better Auth (incl. unified portal sign-in at /api/auth/portal/*)
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+// M-Pesa STK callbacks (public, validated + idempotent) and PDF receipts (session-scoped).
+app.post("/api/mpesa/callback", mpesaCallback);
+app.get("/api/receipts/:paymentId", receiptPdf);
 
 export default app;

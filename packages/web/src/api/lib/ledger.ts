@@ -23,53 +23,59 @@ export interface PostPaymentInput {
  *  3. reduces the client's running balance by the full amount (overpayment → credit)
  */
 export async function postPayment(input: PostPaymentInput) {
+  return db.transaction((tx) => postPaymentTx(tx, input));
+}
+
+/**
+ * Transaction-aware variant used by the M-Pesa callback, which must update the
+ * pending transaction row and post the ledger entry in the same commit.
+ */
+export async function postPaymentTx(tx: Tx, input: PostPaymentInput) {
   const amount = roundKes(input.amountPaidKes);
   const isMpesa = input.paymentChannel.startsWith("MPESA");
   if (isMpesa && !input.mpesaReceiptNumber) {
     throw new ORPCError("BAD_REQUEST", { message: "M-Pesa payments require a receipt number" });
   }
 
-  return db.transaction(async (tx) => {
-    const [client] = await tx.select().from(clients).where(eq(clients.id, input.clientId));
-    if (!client) throw new ORPCError("NOT_FOUND", { message: "Client not found" });
+  const [client] = await tx.select().from(clients).where(eq(clients.id, input.clientId));
+  if (!client) throw new ORPCError("NOT_FOUND", { message: "Client not found" });
 
-    if (input.mpesaReceiptNumber) {
-      const [dupe] = await tx
-        .select({ id: payments.id })
-        .from(payments)
-        .where(eq(payments.mpesaReceiptNumber, input.mpesaReceiptNumber));
-      if (dupe) throw new ORPCError("CONFLICT", { message: `Receipt ${input.mpesaReceiptNumber} already posted` });
+  if (input.mpesaReceiptNumber) {
+    const [dupe] = await tx
+      .select({ id: payments.id })
+      .from(payments)
+      .where(eq(payments.mpesaReceiptNumber, input.mpesaReceiptNumber));
+    if (dupe) throw new ORPCError("CONFLICT", { message: `Receipt ${input.mpesaReceiptNumber} already posted` });
+  }
+
+  let invoice = null;
+  if (input.invoiceId) {
+    const [inv] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId));
+    if (!inv || inv.clientId !== client.id) {
+      throw new ORPCError("BAD_REQUEST", { message: "Invoice does not belong to this client" });
     }
+    invoice = await applyToInvoice(tx, inv.id, amount);
+  }
 
-    let invoice = null;
-    if (input.invoiceId) {
-      const [inv] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId));
-      if (!inv || inv.clientId !== client.id) {
-        throw new ORPCError("BAD_REQUEST", { message: "Invoice does not belong to this client" });
-      }
-      invoice = await applyToInvoice(tx, inv.id, amount);
-    }
+  const [payment] = await tx
+    .insert(payments)
+    .values({
+      clientId: client.id,
+      invoiceId: input.invoiceId ?? null,
+      mpesaReceiptNumber: input.mpesaReceiptNumber ?? null,
+      paymentChannel: input.paymentChannel,
+      amountPaidKes: amount,
+      paymentDate: input.paymentDate ?? new Date(),
+    })
+    .returning();
 
-    const [payment] = await tx
-      .insert(payments)
-      .values({
-        clientId: client.id,
-        invoiceId: input.invoiceId ?? null,
-        mpesaReceiptNumber: input.mpesaReceiptNumber ?? null,
-        paymentChannel: input.paymentChannel,
-        amountPaidKes: amount,
-        paymentDate: input.paymentDate ?? new Date(),
-      })
-      .returning();
+  const [updatedClient] = await tx
+    .update(clients)
+    .set({ currentBalanceKes: subKes(client.currentBalanceKes, amount) })
+    .where(eq(clients.id, client.id))
+    .returning();
 
-    const [updatedClient] = await tx
-      .update(clients)
-      .set({ currentBalanceKes: subKes(client.currentBalanceKes, amount) })
-      .where(eq(clients.id, client.id))
-      .returning();
-
-    return { payment, invoice, client: updatedClient };
-  });
+  return { payment, invoice, client: updatedClient };
 }
 
 async function applyToInvoice(tx: Tx, invoiceId: number, amount: number) {

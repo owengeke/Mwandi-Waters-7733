@@ -28,6 +28,16 @@ const ctx = { context: { headers: new Headers() } };
 const run = <T>(proc: any, input?: unknown): Promise<T> => call(proc, input, ctx as any);
 
 async function main() {
+  // Destructive: the seed deletes every row. Never allow an accidental run
+  // against a hosted or production database.
+  if (process.env.ALLOW_RESEED !== "true") {
+    console.error(
+      "Refusing to reseed. This script deletes all data.\n" +
+        "Set ALLOW_RESEED=true explicitly (and back up local.db first) to continue.",
+    );
+    process.exit(1);
+  }
+
   await db.delete(session);
   await db.delete(account);
   await db.delete(verification);

@@ -32,6 +32,7 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@types/node": "25.3.5",
     "@types/react": "19.1.17",
     "typescript": "7.0.1-rc"
   },

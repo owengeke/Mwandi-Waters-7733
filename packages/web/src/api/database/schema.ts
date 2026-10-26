@@ -156,10 +156,50 @@ export const payments = sqliteTable(
   ],
 );
 
+// ---------- M-Pesa STK transactions ----------
+/**
+ * One row per STK Push request. Persisted (never in memory) so the Vercel
+ * callback can correlate a Safaricom response with the invoice that was paid.
+ * `checkoutRequestId` is unique, and terminal statuses never change again —
+ * that is what makes the callback idempotent.
+ */
+export const MPESA_TRANSACTION_STATUSES = ["PENDING", "SUCCESS", "FAILED", "CANCELLED", "TIMED_OUT"] as const;
+export type MpesaTransactionStatus = (typeof MPESA_TRANSACTION_STATUSES)[number];
+
+export const mpesaTransactions = sqliteTable(
+  "mpesa_transactions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    checkoutRequestId: text("checkout_request_id").notNull().unique(),
+    merchantRequestId: text("merchant_request_id"),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    phoneNumber: text("phone_number").notNull(),
+    amountKes: numeric("amount_kes", { mode: "number" }).notNull(),
+    status: text("status", { enum: MPESA_TRANSACTION_STATUSES }).notNull().default("PENDING"),
+    resultCode: text("result_code"),
+    resultDescription: text("result_description"),
+    mpesaReceiptNumber: text("mpesa_receipt_number"),
+    /** True when the payment was simulated because Daraja credentials are absent. */
+    isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
+    rawCallback: text("raw_callback"),
+    ...timestamps,
+  },
+  (t) => [
+    index("mpesa_transactions_client_idx").on(t.clientId),
+    index("mpesa_transactions_status_idx").on(t.status),
+    check("mpesa_transactions_status_chk", sql`${t.status} IN (${inList(MPESA_TRANSACTION_STATUSES)})`),
+    check("mpesa_transactions_amount_chk", sql`${t.amountKes} > 0`),
+  ],
+);
+
 export type InstallationRequest = typeof installationRequests.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 
 // Better Auth tables (user, session, account, verification) — generated, do not edit by hand.
 export * from "./auth-schema";

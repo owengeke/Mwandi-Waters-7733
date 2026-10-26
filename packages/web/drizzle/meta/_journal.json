@@ -15,6 +15,13 @@
       "when": 1791532772962,
       "tag": "0001_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793007023768,
+      "tag": "0002_dashing_punisher",
+      "breakpoints": true
     }
   ]
 }

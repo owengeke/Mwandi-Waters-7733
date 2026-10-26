@@ -107,6 +107,7 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
           <Field label="Physical address" htmlFor="apply-address" hint="Plot number, street and area, plus a landmark if it helps.">
             <textarea
               id="apply-address"
+              aria-label="Physical address"
               required
               minLength={5}
               rows={3}

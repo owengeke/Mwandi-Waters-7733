@@ -25,8 +25,10 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
   if (me.isLoading) return <FullScreenLoader label="Checking your session…" />;
   if (!me.data) {
     const full = typeof window !== "undefined" ? window.location.pathname : location;
-    return <Redirect to={`/login?next=${encodeURIComponent(full)}`} replace />;
+    // `~/` forces an absolute path — these guards also render inside nested
+    // /admin and /staff routes, where a relative redirect resolves to a dead URL.
+    return <Redirect to={`~/login?next=${encodeURIComponent(full)}`} replace />;
   }
-  if (!roles.includes(me.data.role)) return <Redirect to={HOME_FOR_ROLE[me.data.role]} replace />;
+  if (!roles.includes(me.data.role)) return <Redirect to={`~${HOME_FOR_ROLE[me.data.role]}`} replace />;
   return <>{children}</>;
 }
