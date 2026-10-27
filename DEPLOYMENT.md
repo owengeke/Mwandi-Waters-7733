@@ -75,7 +75,28 @@ The migration files are `drizzle/0000_init.sql` through
 `drizzle/0002_dashing_punisher.sql`. Use `migrate`, not `push`: `push` fails on
 the generated `invoices.amount_due_kes` column.
 
-### 1c. Seeding rules
+### 1c. Verify the hosted import
+
+Copy the database URL and token from the Turso dashboard into the root `.env`
+(local only; never commit them):
+
+```text
+HOSTED_DATABASE_URL=libsql://...
+HOSTED_DATABASE_AUTH_TOKEN=...
+```
+
+Then run the read-only check:
+
+```powershell
+cd packages\web
+bun run db:verify-hosted
+```
+
+It must report **Wanjiru 1,560 | INV-00002 OVERDUE 2,760 due / 1,200 paid**
+and exit successfully. The Vercel variables are still named `DATABASE_URL` and
+`DATABASE_AUTH_TOKEN`; the `HOSTED_*` names are only for local verification.
+
+### 1d. Seeding rules
 
 - `bun run db:seed` is **local only**. It now refuses any `DATABASE_URL` that
   does not start with `file:`, even when `ALLOW_RESEED=true`.
@@ -91,7 +112,7 @@ bun run db:seed
 Remove-Item Env:\ALLOW_RESEED
 ```
 
-### 1d. Rollback
+### 1e. Rollback
 
 - Delete the Turso database from the dashboard.
 - Point `DATABASE_URL` back at `file:local.db` for local work.
