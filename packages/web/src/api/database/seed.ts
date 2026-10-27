@@ -30,6 +30,16 @@ const run = <T>(proc: any, input?: unknown): Promise<T> => call(proc, input, ctx
 async function main() {
   // Destructive: the seed deletes every row. Never allow an accidental run
   // against a hosted or production database.
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+  if (!databaseUrl.startsWith("file:")) {
+    console.error(
+      "Refusing to seed a non-local database.\n" +
+        "The demo seed only runs against a local SQLite file (DATABASE_URL=file:local.db).\n" +
+        "Hosted databases must be migrated and loaded, never reseeded.",
+    );
+    process.exit(1);
+  }
+
   if (process.env.ALLOW_RESEED !== "true") {
     console.error(
       "Refusing to reseed. This script deletes all data.\n" +

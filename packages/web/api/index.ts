@@ -1,0 +1,62 @@
+/**
+ * Vercel serverless entry point (Node runtime).
+ *
+ * Vercel's Node functions receive `(req: IncomingMessage, res: ServerResponse)`,
+ * while the app is a Hono/Web `fetch` handler. This adapter converts one to the
+ * other, including cookies, so the same app used by `src/__server.ts` runs on
+ * Vercel without any Bun- or filesystem-specific code.
+ *
+ * The Vercel project Root Directory is `packages/web`; `vercel.json` rewrites
+ * every `/api/*` request here.
+ */
+import type { IncomingMessage, ServerResponse } from "node:http";
+import app from "../src/api";
+
+const bodyless = new Set(["GET", "HEAD"]);
+
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+    }
+
+    const proto = String(req.headers["x-forwarded-proto"] ?? "https").split(",")[0]!.trim();
+    const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost")
+      .split(",")[0]!
+      .trim();
+    const url = new URL(req.url ?? "/", `${proto}://${host}`);
+
+    let body: Buffer | undefined;
+    if (!bodyless.has(req.method ?? "GET")) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.from(chunk));
+      if (chunks.length) body = Buffer.concat(chunks);
+    }
+
+    const response = await app.fetch(
+      new Request(url, {
+        method: req.method,
+        headers,
+        body: body ? new Uint8Array(body) : undefined,
+      }),
+    );
+
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== "set-cookie") res.setHeader(key, value);
+    });
+    const cookies = response.headers.getSetCookie?.();
+    if (cookies?.length) res.setHeader("set-cookie", cookies);
+
+    const payload = Buffer.from(await response.arrayBuffer());
+    res.end(payload.length ? payload : undefined);
+  } catch (error) {
+    console.error("[vercel] unhandled error", error);
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader("content-type", "application/json");
+    }
+    res.end(JSON.stringify({ error: "Internal Server Error" }));
+  }
+}
