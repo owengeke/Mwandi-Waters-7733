@@ -122,12 +122,15 @@ Remove-Item Env:\ALLOW_RESEED
 
 ## 2. Vercel deployment
 
-The Vercel files are already in the repo:
+The Vercel files are already in the repo, all inside `packages/web`:
 
 - `packages/web/vercel.json` — Vite build, SPA fallback, `/api/*` rewrite.
 - `packages/web/api/index.ts` — the Vercel Node function entry. It adapts
   Vercel's `(req, res)` handler to the same Hono app as local production,
   including request bodies and `Set-Cookie` headers.
+
+There is deliberately no `vercel.json` or `api/` directory at the repository
+root: the project's Root Directory must be `packages/web`.
 
 ### 2a. Push the repo
 
@@ -141,21 +144,26 @@ git push origin main
 ### 2b. Import the project
 
 1. Vercel dashboard → **Add New…** → **Project** → import the GitHub repo.
-2. **Root Directory: leave empty** (the repository root). Do **not** point it at
-   `packages/web`.
+2. **Root Directory: `packages/web`**.
 
-   Vercel always runs the install step at the workspace root. `packages/desktop`
-   depends on `@template/web` through `workspace:*`, a protocol npm does not
-   understand (`EUNSUPPORTEDPROTOCOL`). Building from the repo root lets the
-   installer use Bun, which the repo already pins via `packageManager`.
+   This matters for two reasons:
+
+   - The function must ship the app source. When the root is the repository
+     root, Vercel only compiles the entry file and never bundles
+     `packages/web/src/**`, so the function crashes with
+     `ERR_MODULE_NOT_FOUND: .../packages/web/api/index`.
+   - Bun, not npm, must run the install. `packages/desktop` depends on
+     `@template/web` through `workspace:*`, which npm rejects
+     (`EUNSUPPORTEDPROTOCOL`). Bun still resolves the workspace from
+     `packages/web`.
+
 3. Framework Preset: **Vite**.
-4. Build Command: `cd packages/web && bun run build:ci`.
-5. Output Directory: `packages/web/dist`.
-6. Install Command: `bun install`.
+4. Install Command: `bun install`.
+5. Build Command: `bun run build:ci`.
+6. Output Directory: `dist`.
 
-   The root `vercel.json` sets these three for you; only fill them in the
-   dashboard if you are overriding the file. `api/index.ts` also lives at the
-   repo root and re-exports the real adapter in `packages/web/api/index.ts`.
+   `packages/web/vercel.json` declares the same three values, so they only need
+   to be filled in the dashboard when overriding the file.
 
 7. Add the environment variables from the table below for **Production** (and
    **Preview** if you will use preview URLs).
@@ -204,12 +212,15 @@ If you use a custom domain, update both `WEBSITE_URL` and
 
 | Symptom | Fix |
 | --- | --- |
-| `npm error Unsupported URL Type "workspace:"` | The install ran with npm at the repo root. `packages/desktop` uses `workspace:*`; Root Directory must be empty so the install can use Bun. |
+| Build fails: `Unsupported URL Type "workspace:"` | The install ran with npm. Keep the Install Command on `bun install`; `packages/desktop` uses `workspace:*`, which npm cannot resolve. |
+| Build succeeds but the function crashes: `Cannot find module '/var/task/packages/web/api/index'` | Root Directory is the repository root, so Vercel never bundled the app source. Set Root Directory to `packages/web`. |
+| Function crashes: `Cannot use import statement outside a module` or `Directory import ... is not supported resolving ES modules` | Module-format mismatch. The emitted format follows the nearest `package.json` `type`; the adapter uses extensionless relative imports (`../src/api`), which only resolve under CommonJS. `packages/web/package.json` must not set `"type": "module"`. |
+| Function crashes: `require() of ES Module ... is not supported` | The function is CommonJS and a dependency (`@orpc/server`) is ESM-only. Node 24 supports `require(esm)`; keep the project on Node `24.x`. |
 | Build fails: `Cannot find module '../../__ports.cjs'` | The build read a repo-root file that Vercel did not upload. `vite/ports.ts` falls back to `.runable/ports.json` (or port 4200); keep it in place. |
-| Build fails: `bun: command not found` | The install did not detect the root `bun.lock`. Clear the project's Install Command override so the root `vercel.json` applies. |
+| Build fails: `bun: command not found` | The Install Command override was cleared, or Root Directory is not `packages/web`. |
 | `FUNCTION_INVOCATION_FAILED` on every `/api/*` | The native `libsql` addon cannot load in the serverless runtime. Remote URLs must go through `@libsql/client/web`; only `file:` URLs may use the native client. |
-| `/api/*` returns 404 | The Root Directory is set to `packages/web`, or the root `vercel.json` was not picked up. |
-| Nested page 404s on refresh | The SPA rewrite is missing; confirm `vercel.json` at the repo root is deployed. |
+| `/api/*` returns 404 | `packages/web/vercel.json` is missing or not at the Root Directory, or Root Directory is wrong. |
+| Nested page 404s on refresh | The SPA rewrite is missing; confirm the `vercel.json` at `packages/web` is deployed. |
 | Sign-in says invalid origin / redirects to localhost | `WEBSITE_URL` is wrong, or `VITE_WEBSITE_URL` was set to localhost at build time. |
 | `500` from `/api/rpc/*` | Check function logs; usually `DATABASE_URL`/token or a missing migration. |
 | Callback never arrives | `MPESA_CALLBACK_URL` is not public HTTPS, or Daraja rejected the URL. Check the STK response and `mpesa_transactions`. |

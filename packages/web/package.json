@@ -1,7 +1,6 @@
 {
   "name": "@template/web",
   "private": true,
-  "type": "module",
   "exports": {
     ".": "./src/api/index.ts"
   },

@@ -24,8 +24,11 @@ function createClient() {
     return createRemoteClient({ url: url!, authToken });
   }
 
-  // `import.meta.url` is undefined if a bundler emits CommonJS; fall back to cwd.
-  const requireFrom = createRequire(import.meta.url ?? path.join(process.cwd(), "index.js"));
+  // `createRequire` resolves from the current working directory, which keeps
+  // this working under both ESM (local dev) and the CommonJS bundle Vercel emits.
+  // `path.resolve` is used instead of `process.cwd()` because React Native's
+  // ambient types (pulled in by the mobile typecheck) only declare `process.env`.
+  const requireFrom = createRequire(path.resolve("index.js"));
   const { createClient: createLocalClient } = requireFrom("@libsql/client") as typeof import("@libsql/client");
   return createLocalClient({ url: url!, authToken });
 }
