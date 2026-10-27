@@ -1,12 +1,14 @@
 {
   "name": "@template/web",
   "private": true,
+  "type": "module",
   "exports": {
     ".": "./src/api/index.ts"
   },
   "scripts": {
-    "build": "bun run typecheck && vite build",
-    "build:ci": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
+    "build": "bun run typecheck && vite build && bun run build:api",
+    "build:ci": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && vite build && bun run build:api",
+    "build:api": "bun build src/api/index.ts --target=node --format=esm --packages=external --outfile api/_bundle.mjs",
     "dev": "vite",
     "start": "bun src/__server.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
