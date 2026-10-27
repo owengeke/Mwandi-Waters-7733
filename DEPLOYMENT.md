@@ -29,13 +29,28 @@ Why Turso:
 > commands below are for macOS, Linux, or WSL.
 
 Use the Turso dashboard (turso.tech → sign in → **Create Database**). Choose
-the free plan, name it `mwandi-waters`, and import
-`packages/web/local.db` if the dashboard offers an SQLite import. Otherwise
-create the empty database and use the CLI commands below from macOS/Linux/WSL:
+the free plan and name it `mwandi-waters`. Before uploading, build a clean
+WAL-mode snapshot (Turso requires WAL; `local.db` may be in `delete` mode):
+
+```powershell
+cd packages\web
+bun run db:snapshot
+```
+
+This writes `packages\web\mwandi-waters-upload.db`, validates its integrity,
+and confirms Wanjiru's KES 1,560 balance. Upload **that** file, not `local.db`.
+
+> If the upload dialog says **group not found**, the organization has no
+> database group yet. Create an empty database first with the **New Database**
+> tab and a concrete **Location** (for example London or Frankfurt), then retry
+> the upload. Alternatively create a group named `default` under the
+> dashboard's **Groups** page and select it.
+
+From macOS/Linux/WSL, the equivalent CLI command is:
 
 ```powershell
 turso auth signup
-turso db create mwandi-waters --from-file .\packages\web\local.db
+turso db create mwandi-waters --from-file .\packages\web\mwandi-waters-upload.db
 turso db show mwandi-waters --url
 turso db tokens create mwandi-waters
 ```
@@ -43,15 +58,6 @@ turso db tokens create mwandi-waters
 `--from-file` imports both the schema and the seeded demo data, so Wanjiru's
 KES 1,560 bill is present on the hosted database. Stop the local dev server
 before importing the file so the snapshot is consistent.
-
-If the CLI rejects the file, make a clean copy first and import that:
-
-```powershell
-cd packages\web
-bun -e "const { Database } = require('bun:sqlite'); const db = new Database('local.db'); db.run(\"VACUUM INTO 'demo-snapshot.db'\"); db.close();"
-cd ..\..
-turso db create mwandi-waters --from-file .\packages\web\demo-snapshot.db
-```
 
 ### 1b. Alternative: empty database + migrations
 
