@@ -128,9 +128,25 @@ The Vercel files are already in the repo, all inside `packages/web`:
 - `packages/web/api/index.ts` — the Vercel Node function entry. It adapts
   Vercel's `(req, res)` handler to the same Hono app as local production,
   including request bodies and `Set-Cookie` headers.
+- `packages/web/api/_bundle.mjs` — generated during the build by
+  `bun run build:api`; it bundles `src/api` into one ESM file. Do not commit it.
 
 There is deliberately no `vercel.json` or `api/` directory at the repository
 root: the project's Root Directory must be `packages/web`.
+
+### Deployed project (current)
+
+| Setting | Value |
+| --- | --- |
+| Project | `mwandi-waters-7733-4n4j` (team `owens-projects-d4840d61`) |
+| Production URL | `https://mwandi-waters-7733-4n4j.vercel.app` |
+| Root Directory | `packages/web` |
+| Install / Build / Output | `bun install` / `bun run build:ci` / `dist` |
+| Node | `24.x` |
+| Hosted DB | `libsql://mwandi-waters-owengeke.aws-eu-central-1.turso.io` |
+
+Environment variables present for Production **and** Preview: `DATABASE_URL`,
+`DATABASE_AUTH_TOKEN`, `BETTER_AUTH_SECRET`, `WEBSITE_URL`.
 
 ### 2a. Push the repo
 
@@ -233,7 +249,7 @@ If you use a custom domain, update both `WEBSITE_URL` and
 The callback endpoint is:
 
 ```text
-https://<your-app>.vercel.app/api/mpesa/callback
+https://mwandi-waters-7733-4n4j.vercel.app/api/mpesa/callback
 ```
 
 Steps:
@@ -265,7 +281,7 @@ Notes:
 
 Preconditions: the database has the seeded baseline, and the five `MPESA_*`
 credentials are empty (so the demo badge is visible). Sign in at
-`https://<your-app>.vercel.app/login`.
+`https://mwandi-waters-7733-4n4j.vercel.app/login`.
 
 1. **Sign in as the client.** Use `wanjiru@example.co.ke` / `Mwandi@2026`, or
    phone `0712 345 678`, or account `ACC-0001`.
@@ -284,10 +300,11 @@ credentials are empty (so the demo badge is visible). Sign in at
 7. **Receipt.** Click the receipt action on the payment. A server-generated PDF
    opens from `/api/receipts/<paymentId>.pdf`; it shows the client, invoice,
    amount, M-Pesa receipt number, and date.
-8. **Staff view.** Sign in as `staff@mwandiwaters.co.ke` / `Mwandi@2026`.
-   `/staff/payments` (the ledger) shows the new payment. Visit `/admin` to show
-   that the nested admin route loads instead of a blank screen; visiting
-   `/dashboard` as staff redirects to `/staff`.
+8. **Staff view.** Sign in as `staff@mwandiwaters.co.ke` / `Mwandi@2026`:
+   `/staff/payments` (the ledger) shows the new payment. For the admin console,
+   sign in as `admin@mwandiwaters.co.ke` and open `/admin/payments`; the nested
+   route loads instead of a blank screen. Visiting `/dashboard` as staff
+   redirects to `/staff`.
 
 ### Real STK variant
 
@@ -301,13 +318,18 @@ credentials are empty (so the demo badge is visible). Sign in at
 
 - **Local:** stop the dev server, back up `local.db`, then run the guarded seed
   (section 1c).
-- **Hosted:** run `docs/reset-demo.sql` against Turso:
+- **Hosted:** run `docs/reset-demo.sql` against Turso. The script in the repo
+  does this for you and is guarded by an explicit confirmation:
 
 ```powershell
-turso db shell mwandi-waters < .\docs\reset-demo.sql
+cd packages\web
+$env:CONFIRM_HOSTED_RESET = "yes"
+bun run db:reset-demo
 ```
 
-This restores only Wanjiru's baseline bill and balance and removes demo STK
+It prints the restored balance and invoice afterwards (expect
+`current_balance_kes = 1560`, `INV-00002` / `OVERDUE` / paid `1200`). This
+restores only Wanjiru's baseline bill and balance and removes demo STK
 transactions. It does not touch other clients or the seeded payment history.
 
 ---

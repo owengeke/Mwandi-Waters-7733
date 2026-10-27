@@ -19,7 +19,8 @@
     "db:push": "bun --env-file=../../.env drizzle-kit push",
     "db:seed": "bun --env-file=../../.env src/api/database/seed.ts",
     "db:snapshot": "bun --env-file=../../.env src/api/database/snapshot.ts",
-    "db:verify-hosted": "bun --env-file=../../.env src/api/database/verify-hosted.ts"
+    "db:verify-hosted": "bun --env-file=../../.env src/api/database/verify-hosted.ts",
+    "db:reset-demo": "bun --env-file=../../.env src/api/database/reset-demo.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.19",
