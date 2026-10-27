@@ -74,36 +74,66 @@ async function main() {
   }
   await run(router.installations.approve, { id: reqs[4].id, installationFeeKes: 15000 });
 
-  const usage = [18.4, 22.75, 9.2, 31.05];
-  const invs: any[] = [];
-  for (const [i, c] of installed.entries()) {
-    invs.push(
-      await run(router.invoices.create, {
-        clientId: c.id,
-        billingPeriodStart: "2026-08-01",
-        billingPeriodEnd: "2026-08-31",
-        consumptionUnits: Math.round((usage[i] - 3) * 100) / 100,
-        dueDate: "2026-09-15",
-      }),
-    );
-    invs.push(
-      await run(router.invoices.create, {
-        clientId: c.id,
-        billingPeriodStart: "2026-09-01",
-        billingPeriodEnd: "2026-09-30",
-        consumptionUnits: usage[i],
-        dueDate: "2026-10-20",
-      }),
-    );
+  /**
+   * Six months of billing history (Apr–Sep 2026). Amounts are units × KES 150.
+   * Wanjiru's August and September invoices are issued first so they keep the
+   * demo identifiers INV-00001 (paid) and INV-00002 (the overdue KES 1,560 bill).
+   */
+  const periods = [
+    { start: "2026-04-01", end: "2026-04-30", due: "2026-05-15", units: [17.2, 20.5, 7.5, 26.4] },
+    { start: "2026-05-01", end: "2026-05-31", due: "2026-06-15", units: [19.6, 23.1, 8.8, 29.8] },
+    { start: "2026-06-01", end: "2026-06-30", due: "2026-07-15", units: [16.8, 18.9, 6.9, 27.3] },
+    { start: "2026-07-01", end: "2026-07-31", due: "2026-08-15", units: [21.4, 24.2, 10.1, 30.5] },
+    { start: "2026-08-01", end: "2026-08-31", due: "2026-09-15", units: [15.4, 19.75, 6.2, 28.05] },
+    { start: "2026-09-01", end: "2026-09-30", due: "2026-10-20", units: [18.4, 22.75, 9.2, 31.05] },
+  ] as const;
+
+  const rows: any[][] = installed.map(() => []);
+  const createInvoice = (clientIndex: number, periodIndex: number) => {
+    const period = periods[periodIndex];
+    return run<any>(router.invoices.create, {
+      clientId: installed[clientIndex].id,
+      billingPeriodStart: period.start,
+      billingPeriodEnd: period.end,
+      consumptionUnits: period.units[clientIndex],
+      dueDate: period.due,
+    });
+  };
+
+  rows[0][4] = await createInvoice(0, 4);
+  rows[0][5] = await createInvoice(0, 5);
+  for (const periodIndex of [0, 1, 2, 3]) rows[0][periodIndex] = await createInvoice(0, periodIndex);
+  for (let clientIndex = 1; clientIndex < installed.length; clientIndex++) {
+    for (let periodIndex = 0; periodIndex < periods.length; periodIndex++) {
+      rows[clientIndex][periodIndex] = await createInvoice(clientIndex, periodIndex);
+    }
+  }
+  const invs = rows.flat();
+
+  // Apr–Jul are settled in full for every client, giving the usage chart real history.
+  let receiptSeq = 0;
+  const nextReceipt = () => `QA${String(++receiptSeq).padStart(8, "0")}`;
+  for (const [clientIndex, client] of installed.entries()) {
+    for (const periodIndex of [0, 1, 2, 3]) {
+      const invoice = rows[clientIndex][periodIndex];
+      await run(router.payments.record, {
+        clientId: client.id,
+        invoiceId: invoice.id,
+        paymentChannel: "MPESA_PAYBILL",
+        mpesaReceiptNumber: nextReceipt(),
+        amountPaidKes: invoice.amountDueKes,
+      });
+    }
   }
 
-  // August paid in full for 3 clients, partial for one
-  const receipts = ["QX891234AB", "QX772910CD", "QY104455EF", "QY208833GH", "QZ551200JK"];
-  await run(router.payments.record, { clientId: installed[0].id, invoiceId: invs[0].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: receipts[0], amountPaidKes: invs[0].amountDueKes });
-  await run(router.payments.record, { clientId: installed[1].id, invoiceId: invs[2].id, paymentChannel: "MPESA_STK_PUSH", mpesaReceiptNumber: receipts[1], amountPaidKes: invs[2].amountDueKes });
-  await run(router.payments.record, { clientId: installed[2].id, invoiceId: invs[4].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: receipts[2], amountPaidKes: 500 });
-  await run(router.payments.record, { clientId: installed[3].id, invoiceId: invs[6].id, paymentChannel: "BANK_TRANSFER", amountPaidKes: invs[6].amountDueKes });
-  await run(router.payments.record, { clientId: installed[0].id, invoiceId: invs[1].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: receipts[4], amountPaidKes: 1200 });
+  // Current month mix: August paid in full for three clients and partial for one.
+  await run(router.payments.record, { clientId: installed[0].id, invoiceId: rows[0][4].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: "QX891234AB", amountPaidKes: rows[0][4].amountDueKes });
+  await run(router.payments.record, { clientId: installed[1].id, invoiceId: rows[1][4].id, paymentChannel: "MPESA_STK_PUSH", mpesaReceiptNumber: "QX772910CD", amountPaidKes: rows[1][4].amountDueKes });
+  await run(router.payments.record, { clientId: installed[2].id, invoiceId: rows[2][4].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: "QY104455EF", amountPaidKes: 500 });
+  await run(router.payments.record, { clientId: installed[3].id, invoiceId: rows[3][4].id, paymentChannel: "BANK_TRANSFER", amountPaidKes: rows[3][4].amountDueKes });
+
+  // Wanjiru's overdue September bill: KES 2,760 due, KES 1,200 paid → KES 1,560.
+  await run(router.payments.record, { clientId: installed[0].id, invoiceId: rows[0][5].id, paymentChannel: "MPESA_PAYBILL", mpesaReceiptNumber: "QZ551200JK", amountPaidKes: 1200 });
 
   await createLogin({ name: "David Njoroge", email: "admin@mwandiwaters.co.ke", role: "admin", phoneNumber: "+254700000002" });
   await createLogin({ name: "Faith Achieng", email: "staff@mwandiwaters.co.ke", role: "staff", phoneNumber: "+254700000003" });
