@@ -5,9 +5,11 @@ import path from "path";
 import runableAnalyticsPlugin from "./vite/__plugins/runable-analytics-plugin";
 import honoDevPlugin from "./vite/__plugins/hono-dev-plugin";
 import assetOptimizerPlugin from "./vite/__plugins/asset-optimizer-plugin";
-import ports from "../../__ports.cjs";
+import { ports, repoRoot } from "./vite/ports";
 
-const root = path.resolve(__dirname, "../..");
+// On Vercel the project root is `packages/web`, so the monorepo root may not
+// exist. `repoRoot` resolves to whichever of the two is actually present.
+const root = repoRoot;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, root, "");

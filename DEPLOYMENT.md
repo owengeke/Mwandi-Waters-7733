@@ -144,11 +144,21 @@ git push origin main
 2. Set **Root Directory** to `packages/web` (click **Edit** next to Root
    Directory). This is required: `vercel.json` and `api/index.ts` live there.
 3. Framework Preset: **Vite**.
-4. Build Command: `bun run build`.
+4. Build Command: `npm run build:ci`.
 5. Output Directory: `dist`.
-6. Install Command: leave the default (`bun install`). Vercel detects the
-   root `bun.lock`; if asked, allow it to include files outside the Root
-   Directory so the workspace install can run.
+6. Install Command:
+   `npm install --legacy-peer-deps --no-audit --no-fund`.
+
+   The repo's `bun.lock` sits **outside** the Root Directory, so Vercel cannot
+   see it and will not install Bun. Both commands above therefore use npm. The
+   `vercel.json` in `packages/web` sets them for you; these fields only matter
+   if you override the config in the dashboard.
+
+   `--legacy-peer-deps` is required: npm 10 crashes with
+   `Cannot read properties of null (reading 'edgesOut')` while resolving the
+   `jsdom`/`canvas` peer sets. Bun resolves the same tree without any flag, so
+   local development keeps using `bun install`.
+
 7. Add the environment variables from the table below for **Production** (and
    **Preview** if you will use preview URLs).
 8. Deploy.
@@ -196,6 +206,9 @@ If you use a custom domain, update both `WEBSITE_URL` and
 
 | Symptom | Fix |
 | --- | --- |
+| Build fails: `Cannot find module '../../__ports.cjs'` | The build reads a repo-root file that Vercel does not upload with Root Directory `packages/web`. `vite/ports.ts` falls back to `.runable/ports.json` (or port 4200); keep it in place. |
+| Build fails: `bun: command not found` | Vercel cannot see the root `bun.lock`; use the npm install/build commands from 2b. |
+| `FUNCTION_INVOCATION_FAILED` on every `/api/*` | The native `libsql` addon cannot load in the serverless runtime. Remote URLs must go through `@libsql/client/web`; only `file:` URLs may use the native client. |
 | `/api/*` returns 404 | Root Directory is not `packages/web`, or `vercel.json` was not picked up. |
 | Nested page 404s on refresh | The SPA rewrite is missing; confirm `packages/web/vercel.json` is deployed. |
 | Sign-in says invalid origin / redirects to localhost | `WEBSITE_URL` is wrong, or `VITE_WEBSITE_URL` was set to localhost at build time. |
