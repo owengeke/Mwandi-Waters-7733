@@ -141,23 +141,21 @@ git push origin main
 ### 2b. Import the project
 
 1. Vercel dashboard → **Add New…** → **Project** → import the GitHub repo.
-2. Set **Root Directory** to `packages/web` (click **Edit** next to Root
-   Directory). This is required: `vercel.json` and `api/index.ts` live there.
+2. **Root Directory: leave empty** (the repository root). Do **not** point it at
+   `packages/web`.
+
+   Vercel always runs the install step at the workspace root. `packages/desktop`
+   depends on `@template/web` through `workspace:*`, a protocol npm does not
+   understand (`EUNSUPPORTEDPROTOCOL`). Building from the repo root lets the
+   installer use Bun, which the repo already pins via `packageManager`.
 3. Framework Preset: **Vite**.
-4. Build Command: `npm run build:ci`.
-5. Output Directory: `dist`.
-6. Install Command:
-   `npm install --legacy-peer-deps --no-audit --no-fund`.
+4. Build Command: `cd packages/web && bun run build:ci`.
+5. Output Directory: `packages/web/dist`.
+6. Install Command: `bun install`.
 
-   The repo's `bun.lock` sits **outside** the Root Directory, so Vercel cannot
-   see it and will not install Bun. Both commands above therefore use npm. The
-   `vercel.json` in `packages/web` sets them for you; these fields only matter
-   if you override the config in the dashboard.
-
-   `--legacy-peer-deps` is required: npm 10 crashes with
-   `Cannot read properties of null (reading 'edgesOut')` while resolving the
-   `jsdom`/`canvas` peer sets. Bun resolves the same tree without any flag, so
-   local development keeps using `bun install`.
+   The root `vercel.json` sets these three for you; only fill them in the
+   dashboard if you are overriding the file. `api/index.ts` also lives at the
+   repo root and re-exports the real adapter in `packages/web/api/index.ts`.
 
 7. Add the environment variables from the table below for **Production** (and
    **Preview** if you will use preview URLs).
@@ -206,11 +204,12 @@ If you use a custom domain, update both `WEBSITE_URL` and
 
 | Symptom | Fix |
 | --- | --- |
-| Build fails: `Cannot find module '../../__ports.cjs'` | The build reads a repo-root file that Vercel does not upload with Root Directory `packages/web`. `vite/ports.ts` falls back to `.runable/ports.json` (or port 4200); keep it in place. |
-| Build fails: `bun: command not found` | Vercel cannot see the root `bun.lock`; use the npm install/build commands from 2b. |
+| `npm error Unsupported URL Type "workspace:"` | The install ran with npm at the repo root. `packages/desktop` uses `workspace:*`; Root Directory must be empty so the install can use Bun. |
+| Build fails: `Cannot find module '../../__ports.cjs'` | The build read a repo-root file that Vercel did not upload. `vite/ports.ts` falls back to `.runable/ports.json` (or port 4200); keep it in place. |
+| Build fails: `bun: command not found` | The install did not detect the root `bun.lock`. Clear the project's Install Command override so the root `vercel.json` applies. |
 | `FUNCTION_INVOCATION_FAILED` on every `/api/*` | The native `libsql` addon cannot load in the serverless runtime. Remote URLs must go through `@libsql/client/web`; only `file:` URLs may use the native client. |
-| `/api/*` returns 404 | Root Directory is not `packages/web`, or `vercel.json` was not picked up. |
-| Nested page 404s on refresh | The SPA rewrite is missing; confirm `packages/web/vercel.json` is deployed. |
+| `/api/*` returns 404 | The Root Directory is set to `packages/web`, or the root `vercel.json` was not picked up. |
+| Nested page 404s on refresh | The SPA rewrite is missing; confirm `vercel.json` at the repo root is deployed. |
 | Sign-in says invalid origin / redirects to localhost | `WEBSITE_URL` is wrong, or `VITE_WEBSITE_URL` was set to localhost at build time. |
 | `500` from `/api/rpc/*` | Check function logs; usually `DATABASE_URL`/token or a missing migration. |
 | Callback never arrives | `MPESA_CALLBACK_URL` is not public HTTPS, or Daraja rejected the URL. Check the STK response and `mpesa_transactions`. |

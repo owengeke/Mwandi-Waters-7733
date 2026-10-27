@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "npm install --legacy-peer-deps --include=dev --no-audit --no-fund",
-  "buildCommand": "npm run build:ci",
-  "outputDirectory": "dist",
+  "installCommand": "bun install",
+  "buildCommand": "cd packages/web && bun run build:ci",
+  "outputDirectory": "packages/web/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
