@@ -24,8 +24,14 @@ Why Turso:
 
 ### 1a. Create the database (after approval)
 
-Use the Turso dashboard (turso.tech → sign in → **Create Database**), or the
-Turso CLI:
+> **Windows note:** the Turso CLI requires WSL. This machine does not have WSL
+> installed, so use the Turso dashboard instead (or install WSL first). The CLI
+> commands below are for macOS, Linux, or WSL.
+
+Use the Turso dashboard (turso.tech → sign in → **Create Database**). Choose
+the free plan, name it `mwandi-waters`, and import
+`packages/web/local.db` if the dashboard offers an SQLite import. Otherwise
+create the empty database and use the CLI commands below from macOS/Linux/WSL:
 
 ```powershell
 turso auth signup
