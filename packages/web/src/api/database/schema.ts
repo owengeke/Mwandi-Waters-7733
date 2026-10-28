@@ -5,8 +5,10 @@ import {
   integer,
   numeric,
   index,
+  uniqueIndex,
   check,
 } from "drizzle-orm/sqlite-core";
+import { TARIFF_PER_UNIT_KES } from "../lib/billing";
 
 /**
  * Mwandi Waters — core schema.
@@ -17,8 +19,8 @@ import {
  *
  * Tariff: flat KES 150 per consumption unit (m³). `invoices.amount_due_kes` is a
  * STORED generated column, so the database itself enforces
- *   amount_due_kes = round(consumption_units * 150, 2)
- * Keep TARIFF_PER_UNIT_KES in lib/billing.ts in sync if this ever changes.
+ *   amount_due_kes = round(consumption_units * rate_per_unit_kes, 2)
+ * The fallback uses TARIFF_PER_UNIT_KES from lib/billing.ts — keep them in sync.
  */
 
 // ---------- Enums ----------
@@ -108,8 +110,22 @@ export const invoices = sqliteTable(
     billingPeriodStart: text("billing_period_start").notNull(), // YYYY-MM-DD
     billingPeriodEnd: text("billing_period_end").notNull(), // YYYY-MM-DD
     consumptionUnits: numeric("consumption_units", { mode: "number" }).notNull(),
+    /**
+     * Tariff snapshot captured at issue time (KES per unit). Nullable with no DB
+     * default: existing invoices keep NULL and the generated column falls back to
+     * the legacy 150, so stored amounts never change. New invoices always set it
+     * explicitly in code via the usage procedures.
+     */
+    ratePerUnitKes: numeric("rate_per_unit_kes", { mode: "number" }),
+    issuedBy: text("issued_by"),
+    issuedAt: integer("issued_at", { mode: "timestamp" }),
     amountDueKes: numeric("amount_due_kes", { mode: "number" }).generatedAlwaysAs(
-      sql`round(consumption_units * 150, 2)`,
+      sql.raw(
+        `CASE WHEN rate_per_unit_kes IS NULL
+            THEN round(consumption_units * ${TARIFF_PER_UNIT_KES}, 2)
+            ELSE round(consumption_units * rate_per_unit_kes, 2)
+           END`,
+      ),
       { mode: "stored" },
     ),
     amountPaidKes: numeric("amount_paid_kes", { mode: "number" }).notNull().default(0),
@@ -121,8 +137,10 @@ export const invoices = sqliteTable(
     index("invoices_client_idx").on(t.clientId),
     index("invoices_status_idx").on(t.status),
     index("invoices_due_date_idx").on(t.dueDate),
+    uniqueIndex("invoices_client_period_idx").on(t.clientId, t.billingPeriodStart),
     check("invoices_status_chk", sql`${t.status} IN (${inList(INVOICE_STATUSES)})`),
     check("invoices_units_chk", sql`${t.consumptionUnits} >= 0`),
+    check("invoices_rate_chk", sql`${t.ratePerUnitKes} IS NULL OR ${t.ratePerUnitKes} > 0`),
     check("invoices_paid_chk", sql`${t.amountPaidKes} >= 0`),
     check("invoices_period_chk", sql`${t.billingPeriodEnd} >= ${t.billingPeriodStart}`),
   ],

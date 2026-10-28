@@ -4,6 +4,7 @@ import InstallationsPage from "./pages/installations";
 import ClientsPage from "./pages/clients";
 import InvoicesPage from "./pages/invoices";
 import PaymentsPage from "./pages/payments";
+import UsagePage from "./pages/usage";
 import Landing from "./pages/landing";
 import Login from "./pages/login";
 import ClientDashboard from "./pages/dashboard";
@@ -34,6 +35,7 @@ function Console() {
         <Route path="/clients" component={ClientsPage} />
         <Route path="/invoices" component={InvoicesPage} />
         <Route path="/payments" component={PaymentsPage} />
+        <Route path="/usage" component={UsagePage} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

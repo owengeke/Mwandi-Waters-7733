@@ -9,6 +9,7 @@ import { installations } from "./routes/installations";
 import { clients } from "./routes/clients";
 import { invoices } from "./routes/invoices";
 import { payments } from "./routes/payments";
+import { usage } from "./routes/usage";
 import { mpesaCallback, receiptPdf } from "./routes/mpesa";
 
 // Mwandi Waters API — oRPC procedures served at /api/rpc/*
@@ -24,6 +25,7 @@ export const router = {
   clients,
   invoices,
   payments,
+  usage,
 };
 
 export type AppRouter = typeof router;
