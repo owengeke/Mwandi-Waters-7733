@@ -182,3 +182,36 @@ turso db shell mwandi-waters "UPDATE payments SET invoice_id = (SELECT b.invoice
 turso db shell mwandi-waters "SELECT COUNT(*) AS mismatches FROM payments p JOIN payments_link_backup b ON b.id = p.id WHERE p.invoice_id IS NOT b.invoice_id;"
 # Must be 0 before dropping backup
 ```
+
+---
+
+## If It Fails Midway
+
+**Do NOT re-run blindly.** The database will be in an intermediate state. Assess exactly which step failed:
+
+| Failed at step | Database state | Recovery action |
+|----------------|----------------|-----------------|
+| Step 3 (PRAGMA) | Unchanged | Re-run from Step 3 |
+| Step 4a (CREATE __new_invoices) | `__new_invoices` exists, `invoices` intact | `DROP TABLE __new_invoices;`, then re-run from Step 4a |
+| Step 4b (INSERT) | `__new_invoices` has data, `invoices` intact | `DELETE FROM __new_invoices;`, re-run Step 4b |
+| **Step 4c (DROP TABLE invoices)** | **`invoices` GONE, data in `__new_invoices`** | **Do NOT re-run DROP.** Run: `ALTER TABLE __new_invoices RENAME TO invoices;` then re-run from Step 4d |
+| Step 4d (RENAME) | `__new_invoices` renamed to `invoices` (OK) | Continue from Step 4e |
+| Step 4e (PRAGMA ON) | FK off | Run `PRAGMA foreign_keys=ON;` then continue |
+| Step 4f+ (indexes) | Partial indexes | Re-run missing `CREATE INDEX` statements |
+| Step 5+ (verification) | Migration complete | Run repair if needed, then continue |
+
+**Critical: If DROP TABLE ran but RENAME did not**, you have no `invoices` table but all data is in `__new_invoices`. The fix is a single statement:
+```bash
+turso db shell mwandi-waters "ALTER TABLE __new_invoices RENAME TO invoices;"
+```
+Then continue with `PRAGMA foreign_keys=ON;` and the index creation steps.
+
+**If you cannot determine the state:** Stop. Use the copy you made in Step 0:
+```bash
+# Delete the failed DB and re-copy from the original
+turso db delete mwandi-waters-migration-failed
+turso db copy mwandi-waters mwandi-waters-migration-test
+```
+Then start from Step 1 on the fresh copy.
+
+**Never** run the migration script a second time on a database that already has `__new_invoices` or is missing `invoices` — it will abort with "table already exists" or corrupt data.
