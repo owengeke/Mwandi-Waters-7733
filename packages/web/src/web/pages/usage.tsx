@@ -104,10 +104,10 @@ export default function UsagePage() {
     );
   }
 
-  function saveCorrection(invoiceId: number) {
+  function saveCorrection(invoiceId: number, clientId: number) {
     setError(null);
     setSuccess(null);
-    const raw = draftUnits[invoiceId];
+    const raw = draftUnits[clientId];
     const u = Number(raw);
     if (!Number.isFinite(u) || u < 0) {
       setError("Enter a valid unit count.");
@@ -267,7 +267,7 @@ export default function UsagePage() {
                     )}
                     {inv && editing === inv.id && (
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" onClick={() => saveCorrection(inv.id)} disabled={correct.isPending}>
+                        <Button size="sm" onClick={() => saveCorrection(inv.id, c.client.id)} disabled={correct.isPending}>
                           Save
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
