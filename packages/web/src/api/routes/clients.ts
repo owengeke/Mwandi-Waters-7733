@@ -6,7 +6,8 @@ import { db } from "../database";
 import * as t from "../database/schema";
 import { CLIENT_STATUSES } from "../database/schema";
 import { accountNumber, meterNumber, pending } from "../lib/identifiers";
-import { kenyanPhone, idInput, pagination } from "../lib/validators";
+import { kenyanPhone, idInput, pagination, readingValue } from "../lib/validators";
+import { todayISO } from "../lib/billing";
 
 export const clients = {
   list: operator
@@ -65,19 +66,33 @@ export const clients = {
         fullName: z.string().trim().min(2).max(120),
         phoneNumber: kenyanPhone,
         meterNumber: z.string().trim().toUpperCase().regex(/^MTR-\d{4,}$/).optional(),
+        /** First number on the meter. Creates no invoice and no charge. */
+        openingReading: readingValue.default(0),
       }),
     )
-    .handler(({ input }) =>
+    .handler(({ input, context }) =>
       db.transaction(async (tx) => {
+        const { openingReading, ...clientInput } = input;
         const [row] = await tx
           .insert(t.clients)
-          .values({ ...input, accountNumber: pending(), meterNumber: input.meterNumber ?? pending() })
+          .values({ ...clientInput, accountNumber: pending(), meterNumber: clientInput.meterNumber ?? pending() })
           .returning();
         const [final] = await tx
           .update(t.clients)
-          .set({ accountNumber: accountNumber(row.id), meterNumber: input.meterNumber ?? meterNumber(row.id) })
+          .set({ accountNumber: accountNumber(row.id), meterNumber: clientInput.meterNumber ?? meterNumber(row.id) })
           .where(eq(t.clients.id, row.id))
           .returning();
+        await tx.insert(t.meterReadings).values({
+          clientId: final.id,
+          readingValue: openingReading,
+          previousReading: openingReading,
+          unitsConsumed: 0,
+          readingDate: todayISO(),
+          recordedBy: (context.user as { email?: string }).email ?? null,
+          invoiceId: null,
+          isOpening: true,
+          meterNumber: final.meterNumber,
+        });
         return final;
       }),
     ),

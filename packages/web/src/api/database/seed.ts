@@ -6,8 +6,10 @@
 import { call } from "@orpc/server";
 import { router } from "../index";
 import { db } from "./index";
-import { payments, invoices, clients, installationRequests, user, session, account, verification } from "./schema";
+import { payments, invoices, clients, installationRequests, meterReadings, user, session, account, verification } from "./schema";
+import { eq } from "drizzle-orm";
 import { auth } from "../auth";
+import { addDaysISO, roundReading } from "../lib/meter-readings";
 
 export const DEMO_PASSWORD = "Mwandi@2026";
 
@@ -52,6 +54,7 @@ async function main() {
   await db.delete(account);
   await db.delete(verification);
   await db.delete(user);
+  await db.delete(meterReadings);
   await db.delete(payments);
   await db.delete(installationRequests);
   await db.delete(invoices);
@@ -148,6 +151,50 @@ async function main() {
   await createLogin({ name: "David Njoroge", email: "admin@mwandiwaters.co.ke", role: "admin", phoneNumber: "+254700000002" });
   await createLogin({ name: "Faith Achieng", email: "staff@mwandiwaters.co.ke", role: "staff", phoneNumber: "+254700000003" });
   await createLogin({ name: installed[0].fullName, email: "wanjiru@example.co.ke", role: "client", phoneNumber: installed[0].phoneNumber, clientId: installed[0].id });
+
+  /**
+   * Meter readings: a synthetic cumulative chain per client (opening 0) that
+   * mirrors the 0004 migration backfill, so the usage screen and the client
+   * dashboard have real history from the first load.
+   */
+  for (const [clientIndex, client] of installed.entries()) {
+    const clientInvoices = rows[clientIndex]
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.billingPeriodStart.localeCompare(b.billingPeriodStart));
+    if (clientInvoices.length === 0) continue;
+
+    // markInstalled already created today's opening reading. Replace it with a
+    // synthetic historical opening so the demo chain reads in chronological order.
+    await db.delete(meterReadings).where(eq(meterReadings.clientId, client.id));
+
+    await db.insert(meterReadings).values({
+      clientId: client.id,
+      readingValue: 0,
+      previousReading: 0,
+      unitsConsumed: 0,
+      readingDate: addDaysISO(clientInvoices[0].billingPeriodStart, -1),
+      recordedBy: "seed",
+      isOpening: true,
+      meterNumber: client.meterNumber,
+    });
+
+    let previous = 0;
+    for (const invoice of clientInvoices) {
+      const cumulative = roundReading(previous + Number(invoice.consumptionUnits));
+      await db.insert(meterReadings).values({
+        clientId: client.id,
+        readingValue: cumulative,
+        previousReading: previous,
+        unitsConsumed: Number(invoice.consumptionUnits),
+        readingDate: invoice.billingPeriodEnd,
+        recordedBy: "seed",
+        invoiceId: invoice.id,
+        isOpening: false,
+        meterNumber: client.meterNumber,
+      });
+      previous = cumulative;
+    }
+  }
 
   const { updated } = await run<{ updated: number }>(router.invoices.markOverdue);
   console.log(`Seeded ${reqs.length} requests, ${installed.length} clients, ${invs.length} invoices; ${updated} overdue.`);

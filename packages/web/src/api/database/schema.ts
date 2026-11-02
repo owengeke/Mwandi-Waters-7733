@@ -137,7 +137,9 @@ export const invoices = sqliteTable(
     index("invoices_client_idx").on(t.clientId),
     index("invoices_status_idx").on(t.status),
     index("invoices_due_date_idx").on(t.dueDate),
-    uniqueIndex("invoices_client_period_idx").on(t.clientId, t.billingPeriodStart),
+    // A reading can be taken more than once on the same day, so this is a
+    // lookup index rather than the old one-invoice-per-window guard.
+    index("invoices_client_period_idx").on(t.clientId, t.billingPeriodStart),
     check("invoices_status_chk", sql`${t.status} IN (${inList(INVOICE_STATUSES)})`),
     check("invoices_units_chk", sql`${t.consumptionUnits} >= 0`),
     check("invoices_rate_chk", sql`${t.ratePerUnitKes} IS NULL OR ${t.ratePerUnitKes} > 0`),
@@ -171,6 +173,60 @@ export const payments = sqliteTable(
     index("payments_date_idx").on(t.paymentDate),
     check("payments_channel_chk", sql`${t.paymentChannel} IN (${inList(PAYMENT_CHANNELS)})`),
     check("payments_amount_chk", sql`${t.amountPaidKes} > 0`),
+  ],
+);
+
+// ---------- Meter readings ----------
+/**
+ * Physical meter readings. `reading_value` is the number on the meter; the
+ * server derives `units_consumed = reading_value - previous_reading` and never
+ * trusts a client-supplied unit count.
+ *
+ * The opening reading is a row with `is_opening = 1`, `previous_reading =
+ * reading_value` and `units_consumed = 0`, so it starts the chain without
+ * generating a charge. A meter replacement starts a new chain with another
+ * opening row, so units can never go negative across a meter change.
+ */
+export const meterReadings = sqliteTable(
+  "meter_readings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** The number shown on the meter at the visit. */
+    readingValue: numeric("reading_value", { mode: "number" }).notNull(),
+    /** The previous reading this one was measured against. */
+    previousReading: numeric("previous_reading", { mode: "number" }).notNull(),
+    /** Derived server-side: reading_value - previous_reading (0 for openings). */
+    unitsConsumed: numeric("units_consumed", { mode: "number" }).notNull().default(0),
+    readingDate: text("reading_date").notNull(), // YYYY-MM-DD
+    recordedBy: text("recorded_by"),
+    /** Set for billed readings; NULL for the opening reading. */
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    isOpening: integer("is_opening", { mode: "boolean" }).notNull().default(false),
+    /** Meter this reading belongs to, so history survives a meter replacement. */
+    meterNumber: text("meter_number"),
+    /** Audit trail for the Correct action. */
+    correctedBy: text("corrected_by"),
+    correctedAt: integer("corrected_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("meter_readings_client_idx").on(t.clientId),
+    index("meter_readings_client_date_idx").on(t.clientId, t.readingDate),
+    uniqueIndex("meter_readings_invoice_idx").on(t.invoiceId),
+    // Guards a repeated submit (double click) with the same number on the same
+    // day. Openings are excluded because each meter chain has its own opening.
+    uniqueIndex("meter_readings_client_reading_idx")
+      .on(t.clientId, t.readingDate, t.readingValue)
+      .where(sql`${t.isOpening} = 0`),
+    check("meter_readings_value_chk", sql`${t.readingValue} >= 0`),
+    check("meter_readings_previous_chk", sql`${t.previousReading} >= 0`),
+    check("meter_readings_units_chk", sql`${t.unitsConsumed} >= 0`),
+    check("meter_readings_opening_chk", sql`${t.isOpening} IN (0, 1)`),
   ],
 );
 
@@ -217,6 +273,7 @@ export type InstallationRequest = typeof installationRequests.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type MeterReading = typeof meterReadings.$inferSelect;
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 
 // Better Auth tables (user, session, account, verification) — generated, do not edit by hand.

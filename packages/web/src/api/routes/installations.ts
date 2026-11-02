@@ -3,10 +3,11 @@ import { desc, eq, like, or, and, type SQL } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { operator } from "../middleware/auth";
 import { db } from "../database";
-import { installationRequests, clients, INSTALLATION_STATUSES, type InstallationStatus } from "../database/schema";
+import { installationRequests, clients, meterReadings, INSTALLATION_STATUSES, type InstallationStatus } from "../database/schema";
 import { accountNumber, meterNumber, pending } from "../lib/identifiers";
 import { createInstallationRequest } from "../lib/installations";
-import { kenyanPhone, kes, idInput, pagination } from "../lib/validators";
+import { kenyanPhone, kes, idInput, pagination, readingValue } from "../lib/validators";
+import { todayISO } from "../lib/billing";
 
 /** Allowed lifecycle transitions. */
 const TRANSITIONS: Record<InstallationStatus, InstallationStatus[]> = {
@@ -114,8 +115,14 @@ export const installations = {
    * a meter (MTR-XXXX, or a supplied existing one) atomically.
    */
   markInstalled: operator
-    .input(idInput.extend({ meterNumber: z.string().trim().toUpperCase().regex(/^MTR-\d{4,}$/).optional() }))
-    .handler(async ({ input }) => {
+    .input(
+      idInput.extend({
+        meterNumber: z.string().trim().toUpperCase().regex(/^MTR-\d{4,}$/).optional(),
+        /** The first number on the newly fitted meter. */
+        openingReading: readingValue.default(0),
+      }),
+    )
+    .handler(async ({ input, context }) => {
       const req = await getOrThrow(input.id);
       assertTransition(req.status, "INSTALLED");
       return db.transaction(async (tx) => {
@@ -141,7 +148,18 @@ export const installations = {
           .set({ status: "INSTALLED", clientId: finalClient.id })
           .where(eq(installationRequests.id, req.id))
           .returning();
-        return { request, client: finalClient };
+        await tx.insert(meterReadings).values({
+          clientId: finalClient.id,
+          readingValue: input.openingReading,
+          previousReading: input.openingReading,
+          unitsConsumed: 0,
+          readingDate: todayISO(),
+          recordedBy: (context.user as { email?: string }).email ?? null,
+          invoiceId: null,
+          isOpening: true,
+          meterNumber: finalClient.meterNumber,
+        });
+        return { request, client: finalClient, openingReading: input.openingReading };
       });
     }),
 };

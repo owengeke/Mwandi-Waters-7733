@@ -21,6 +21,18 @@ const twoDp = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
 export const kes = z.number().nonnegative().max(100_000_000).refine(twoDp, "Max 2 decimal places");
 export const positiveKes = z.number().positive().max(100_000_000).refine(twoDp, "Max 2 decimal places");
 
+/**
+ * A physical meter reading: non-negative, at most 2 decimal places, rounded to
+ * hundredths. Cumulative meters can run high, so the ceiling is generous.
+ */
+export const readingValue = z
+  .number()
+  .finite()
+  .nonnegative("Reading must be non-negative")
+  .max(10_000_000, "Reading looks too high")
+  .refine(twoDp, "Max 2 decimal places")
+  .transform((v) => Math.round(v * 100) / 100);
+
 export const idInput = z.object({ id: z.number().int().positive() });
 
 export const pagination = z.object({

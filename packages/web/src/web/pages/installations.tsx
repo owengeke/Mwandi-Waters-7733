@@ -52,6 +52,7 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
   );
   const [reason, setReason] = useState("");
   const [meter, setMeter] = useState("");
+  const [openingReading, setOpeningReading] = useState("0");
   const [showReject, setShowReject] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ accountNumber: string; meterNumber: string } | null>(null);
@@ -96,8 +97,17 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
       setError("Meter numbers look like MTR-0001.");
       return;
     }
+    const opening = Number(openingReading);
+    if (!openingReading.trim() || !Number.isFinite(opening) || opening < 0) {
+      setError("Enter the opening meter reading (0 if the meter starts at zero).");
+      return;
+    }
+    if (Math.abs(opening * 100 - Math.round(opening * 100)) > 1e-6) {
+      setError("The opening reading can have at most 2 decimal places.");
+      return;
+    }
     markInstalled.mutate(
-      { id: request.id, meterNumber: supplied || undefined },
+      { id: request.id, meterNumber: supplied || undefined, openingReading: opening },
       { onSuccess: (res) => setCreated({ accountNumber: res.client.accountNumber, meterNumber: res.client.meterNumber }), onError },
     );
   }
@@ -272,6 +282,19 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
               value={meter}
               onChange={(e) => setMeter(e.target.value)}
               placeholder="MTR-1042 (optional)"
+              disabled={busy}
+            />
+          </Field>
+          <Field
+            label="Opening meter reading"
+            htmlFor="opening-reading"
+            hint="The number on the meter at installation. Creates no charge; the first bill starts from here."
+          >
+            <Input
+              id="opening-reading"
+              inputMode="decimal"
+              value={openingReading}
+              onChange={(e) => setOpeningReading(e.target.value)}
               disabled={busy}
             />
           </Field>

@@ -12,7 +12,7 @@ const NAV = [
   { href: "/clients", label: "Clients", Icon: Users },
   { href: "/invoices", label: "Invoices", Icon: ReceiptText },
   { href: "/payments", label: "Payments", Icon: Wallet },
-  { href: "/usage", label: "Usage", Icon: ReceiptText, adminOnly: true },
+  { href: "/usage", label: "Usage", Icon: ReceiptText },
 ];
 
 export function BrandMark({ className }: { className?: string }) {
@@ -44,11 +44,11 @@ function Brand() {
   );
 }
 
-function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Main">
-      {NAV.filter((n) => !n.adminOnly || isAdmin).map(({ href, label, Icon }) => {
+      {NAV.map(({ href, label, Icon }) => {
         const active = href === "/" ? location === "/" : location.startsWith(href);
         return (
           <Link
@@ -109,8 +109,6 @@ function Account() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const me = useMe();
-  const isAdmin = me.data?.role === "super_admin" || me.data?.role === "admin";
   return (
     <div className="min-h-dvh lg:pl-[248px]">
       {/* Desktop sidebar */}
@@ -122,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Operations
           </p>
-          <NavLinks isAdmin={isAdmin} />
+          <NavLinks />
         </div>
         <div className="space-y-3 border-t border-sidebar-border pt-4">
           <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Appearance</p>
@@ -161,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <div className="mt-8 flex-1">
-              <NavLinks onNavigate={() => setOpen(false)} isAdmin={isAdmin} />
+              <NavLinks onNavigate={() => setOpen(false)} />
             </div>
             <div className="space-y-3">
               <ThemeSwitcher />

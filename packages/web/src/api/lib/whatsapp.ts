@@ -24,9 +24,9 @@ export const whatsappConfigured = () =>
 /**
  * Invoice notices need their own approved template: WhatsApp only allows
  * business-initiated messages through a template. Set
- * `WHATSAPP_INVOICE_TEMPLATE` (e.g. mwandi_invoice) with six body variables:
- * {{1}} name, {{2}} invoice number, {{3}} period, {{4}} units, {{5}} amount,
- * {{6}} previous reading sentence.
+ * `WHATSAPP_INVOICE_TEMPLATE` (e.g. mwandi_invoice) with eight body variables:
+ * {{1}} name, {{2}} invoice number, {{3}} reading date, {{4}} previous reading,
+ * {{5}} current reading, {{6}} units used, {{7}} amount, {{8}} due date.
  */
 export const whatsappInvoiceConfigured = () =>
   whatsappConfigured() && Boolean(process.env.WHATSAPP_INVOICE_TEMPLATE);

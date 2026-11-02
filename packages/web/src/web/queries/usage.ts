@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "../lib/api";
-import type { UsageHalf } from "../../api/lib/usage-period";
 
-export function useUsage(month: string, half: UsageHalf) {
-  return useQuery(orpc.usage.list.queryOptions({ input: { month, half } }));
+export function useUsage() {
+  return useQuery(orpc.usage.list.queryOptions());
 }
 
-export function useUsageHistory() {
+export function useMeterHistory() {
   return useQuery(orpc.usage.history.queryOptions({ input: {} }));
 }
 
@@ -17,17 +16,28 @@ function useInvalidate() {
     qc.invalidateQueries({ queryKey: orpc.invoices.key() });
     qc.invalidateQueries({ queryKey: orpc.dashboard.key() });
     qc.invalidateQueries({ queryKey: orpc.account.key() });
+    qc.invalidateQueries({ queryKey: orpc.clients.key() });
   };
 }
 
-export function useIssueUsage() {
+export function useRecordUsage() {
   const onSuccess = useInvalidate();
-  return useMutation(orpc.usage.issue.mutationOptions({ onSuccess }));
+  return useMutation(orpc.usage.record.mutationOptions({ onSuccess }));
 }
 
-export function useBulkUsage() {
+export function useRecordManyUsage() {
   const onSuccess = useInvalidate();
-  return useMutation(orpc.usage.bulk.mutationOptions({ onSuccess }));
+  return useMutation(orpc.usage.recordMany.mutationOptions({ onSuccess }));
+}
+
+export function useSetOpening() {
+  const onSuccess = useInvalidate();
+  return useMutation(orpc.usage.setOpening.mutationOptions({ onSuccess }));
+}
+
+export function useReplaceMeter() {
+  const onSuccess = useInvalidate();
+  return useMutation(orpc.usage.replaceMeter.mutationOptions({ onSuccess }));
 }
 
 export function useCorrectUsage() {

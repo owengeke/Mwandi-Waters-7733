@@ -6,7 +6,7 @@ import { Code } from "../components/code";
 import { BalanceCard, OpenInvoicesCard } from "../components/client/billing-summary";
 import { BillsCard } from "../components/client/bills-card";
 import { PaymentsCard } from "../components/client/payments-card";
-import { UsageHistoryCard } from "../components/client/usage-history-card";
+import { MeterReadingsCard } from "../components/client/meter-readings-card";
 import { AccountDetailsCard } from "../components/client/account-details-card";
 import { PaymentDialog } from "../components/client/payment-dialog";
 import { DemoBadge, Section } from "../components/client/section";
@@ -62,7 +62,7 @@ export const Dashboard = function Dashboard() {
                   Meter <Code>{client.meterNumber}</Code>
                 </span>
                 <span className="hidden h-3 w-px bg-border sm:block" aria-hidden />
-                <span>{formatUnits(invoices[0]?.consumptionUnits ?? 0)} units last period</span>
+                <span>{formatUnits(invoices[0]?.consumptionUnits ?? 0)} units on your latest bill</span>
               </p>
             ) : (
               <div className="mt-3 h-4 w-64 animate-pulse rounded bg-muted" />
@@ -157,10 +157,10 @@ export const Dashboard = function Dashboard() {
 
             <Section
               id="usage"
-              title="Usage history"
-              description="Your meter is read every 15 days. Compare recent readings and see what each one cost."
+              title="Meter readings"
+              description="Every physical meter reading on your account, newest first. Units and bills come from the difference between readings."
             >
-              <UsageHistoryCard />
+              <MeterReadingsCard />
             </Section>
 
             <Section id="account" title="Account" description="Your service details and the easiest way to pay.">

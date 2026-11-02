@@ -19,7 +19,7 @@ const NAV = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
   { id: "bills", label: "Bills", Icon: ReceiptText },
   { id: "payments", label: "Payments", Icon: Wallet },
-  { id: "usage", label: "Usage", Icon: BarChart3 },
+  { id: "usage", label: "Meter readings", Icon: BarChart3 },
   { id: "account", label: "Account", Icon: UserRound },
 ] as const;
 

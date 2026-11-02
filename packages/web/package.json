@@ -21,7 +21,8 @@
     "db:snapshot": "bun --env-file=../../.env src/api/database/snapshot.ts",
     "db:verify-hosted": "bun --env-file=../../.env src/api/database/verify-hosted.ts",
     "db:reset-demo": "bun --env-file=../../.env src/api/database/reset-demo.ts",
-    "db:migrate-hosted-0003": "bun scripts/migrate-hosted-0003.ts"
+    "db:migrate-hosted-0003": "bun scripts/migrate-hosted-0003.ts",
+    "db:migrate-hosted-0004": "bun scripts/migrate-hosted-0004.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.19",

@@ -1,54 +1,60 @@
 import { describe, expect, test } from "bun:test";
-import { composeInvoiceMessage, previousReadingLine } from "./notify-invoice";
+import { composeInvoiceMessage, readingsLine } from "./notify-invoice";
 
-describe("previousReadingLine", () => {
-  test("shows previous units, current units and the change", () => {
-    expect(previousReadingLine(18, 21)).toBe("Previous: 18 units, now 21 units (+3).");
-    expect(previousReadingLine(21, 18)).toBe("Previous: 21 units, now 18 units (-3).");
-    expect(previousReadingLine(18, 18)).toBe("Previous: 18 units, now 18 units (0).");
+describe("readingsLine", () => {
+  test("shows previous, current and units used", () => {
+    expect(readingsLine(15, 32, 17)).toBe(
+      "Previous reading 15; current reading 32; 17 units used.",
+    );
+    expect(readingsLine(22.75, 31.95, 9.2)).toBe(
+      "Previous reading 22.75; current reading 31.95; 9.2 units used.",
+    );
   });
 
-  test("omits the sentence for a first reading", () => {
-    expect(previousReadingLine(null, 21)).toBe("");
+  test("labels the very first reading", () => {
+    expect(readingsLine(null, 2, 2)).toBe("First reading; current reading 2; 2 units used.");
   });
 });
 
 describe("composeInvoiceMessage", () => {
-  test("keeps the invoice details and adds the previous reading", () => {
+  test("keeps the invoice details and adds the readings", () => {
     const message = composeInvoiceMessage({
       client: { fullName: "Mary Wanjiru", phoneNumber: "+254719709885" },
       invoice: {
         invoiceNumber: "INV-00002",
-        consumptionUnits: 21,
-        amountDueKes: 3150,
-        dueDate: "2026-11-30",
+        consumptionUnits: 17,
+        amountDueKes: 2550,
+        dueDate: "2026-11-16",
       },
-      periodLabel: "16–30 Nov 2026",
-      previousUnits: 18,
+      readingDate: "2026-11-02",
+      previousReading: 15,
+      currentReading: 32,
     });
 
     expect(message).toContain("Mary");
     expect(message).toContain("INV-00002");
-    expect(message).toContain("16–30 Nov 2026");
-    expect(message).toContain("21 units");
-    expect(message).toContain("KES 3,150.00");
-    expect(message).toContain("Previous: 18 units, now 21 units (+3).");
+    expect(message).toContain("2 Nov 2026");
+    expect(message).toContain("17 units");
+    expect(message).toContain("KES 2,550.00");
+    expect(message).toContain("Previous reading 15; current reading 32; 17 units used.");
   });
 
-  test("first reading has no previous sentence", () => {
+  test("first reading has no previous value", () => {
     const message = composeInvoiceMessage({
       client: { fullName: "Mary Wanjiru", phoneNumber: "+254719709885" },
       invoice: {
         invoiceNumber: "INV-00001",
         consumptionUnits: 12,
         amountDueKes: 1800,
-        dueDate: "2026-11-30",
+        dueDate: "2026-11-16",
       },
-      periodLabel: "1–15 Nov 2026",
-      previousUnits: null,
+      readingDate: "2026-11-02",
+      previousReading: null,
+      currentReading: 12,
     });
 
     expect(message).toContain("12 units");
-    expect(message).not.toContain("Previous:");
+    expect(message).toContain("First reading; current reading 12; 12 units used.");
+    expect(message).not.toContain("Previous reading");
   });
 });
