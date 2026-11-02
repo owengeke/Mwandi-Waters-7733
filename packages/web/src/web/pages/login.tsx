@@ -159,7 +159,7 @@ export const Login = function Login() {
           </div>
 
           <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
-            <Field label="Phone, account number or email" htmlFor="identifier" hint={otpStage ? undefined : "e.g. 0712 345 678, ACC-0001 or you@example.com"}>
+            <Field label="Phone, account number or email" htmlFor="identifier" hint={otpStage ? undefined : "e.g. 0712 000 000, ACC-0001 or you@example.com"}>
               <Input
                 id="identifier"
                 autoComplete="username"
@@ -169,7 +169,7 @@ export const Login = function Login() {
                 value={identifier}
                 disabled={!!otpStage}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="0712 345 678"
+                placeholder="0712 000 000"
                 className="bg-white/70 dark:bg-[#0B132B]/60"
               />
             </Field>

@@ -7,6 +7,7 @@ import { db } from "../database";
 import { installationRequests } from "../database/schema";
 import { kenyanPhone } from "../lib/validators";
 import { createInstallationRequest } from "../lib/installations";
+import { publicTrackingView } from "../lib/privacy";
 import { HOME_FOR_ROLE, isRole } from "../lib/roles";
 
 const OPEN = ["PENDING_REVIEW", "APPROVED_PENDING_PAYMENT", "PAID"] as const;
@@ -37,23 +38,18 @@ export const portal = {
       return { referenceNumber: row.referenceNumber, status: row.status, createdAt: row.createdAt };
     }),
 
-  /** Status lookup by reference. Returns no contact details or address. */
+  /**
+   * Status lookup by reference. Public, so it returns only the reference, the
+   * status and (while awaiting payment) the installation fee — never the
+   * applicant's name, phone, address or estate.
+   */
   trackApplication: base
     .input(z.object({ referenceNumber: z.string().trim().toUpperCase().regex(/^REQ-?\d{1,}$/, "Use the format REQ-0001") }))
     .handler(async ({ input }) => {
       const ref = `REQ-${input.referenceNumber.replace(/\D/g, "").padStart(4, "0")}`;
       const [row] = await db.select().from(installationRequests).where(eq(installationRequests.referenceNumber, ref));
       if (!row) throw new ORPCError("NOT_FOUND", { message: `No application found for ${ref}` });
-      const [first, ...rest] = row.fullName.split(/\s+/);
-      return {
-        referenceNumber: row.referenceNumber,
-        applicant: `${first}${rest.length ? ` ${rest.at(-1)![0]}.` : ""}`,
-        status: row.status,
-        installationFeeKes: row.status === "APPROVED_PENDING_PAYMENT" ? row.installationFeeKes : null,
-        rejectionReason: row.status === "REJECTED" ? row.rejectionReason : null,
-        submittedAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      };
+      return publicTrackingView(row);
     }),
 
   /** Current session, role and where that role should land. */

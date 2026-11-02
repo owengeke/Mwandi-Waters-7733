@@ -155,11 +155,15 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 /**
  * GET /api/receipts/:paymentId.pdf — PDF receipt (the extension is optional).
- * Clients may only download their own receipts; operators may download any.
+ *
+ * Signed in: clients may only download their own receipts; operators may
+ * download any, and both see the full details.
+ *
+ * Signed out: the link still resolves, but only to a privacy-protected copy —
+ * a masked "First L." name, with no phone, account or meter number.
  */
 export async function receiptPdf(c: Context) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return c.json({ error: "Sign in required" }, 401);
 
   const paymentId = Number((c.req.param("paymentId") ?? "").replace(/\.pdf$/i, ""));
   if (!Number.isInteger(paymentId) || paymentId <= 0) return c.json({ error: "Receipt not found" }, 404);
@@ -172,10 +176,12 @@ export async function receiptPdf(c: Context) {
     .where(eq(payments.id, paymentId));
   if (!row) return c.json({ error: "Receipt not found" }, 404);
 
-  const role: Role = isRole(session.user.role) ? session.user.role : "client";
-  const isOperator = OPERATOR_ROLES.includes(role);
-  const ownsReceipt = role === "client" && Number(session.user.clientId) === row.payment.clientId;
-  if (!isOperator && !ownsReceipt) return c.json({ error: "Not permitted" }, 403);
+  if (session) {
+    const role: Role = isRole(session.user.role) ? session.user.role : "client";
+    const isOperator = OPERATOR_ROLES.includes(role);
+    const ownsReceipt = role === "client" && Number(session.user.clientId) === row.payment.clientId;
+    if (!isOperator && !ownsReceipt) return c.json({ error: "Not permitted" }, 403);
+  }
 
   const [trx] = row.payment.mpesaReceiptNumber
     ? await db
@@ -198,6 +204,7 @@ export async function receiptPdf(c: Context) {
     phoneNumber: row.client.phoneNumber,
     invoiceNumber: row.invoice?.invoiceNumber ?? null,
     isDemo: Boolean(trx?.isDemo),
+    masked: !session,
   });
 
   return new Response(pdf as unknown as BodyInit, {

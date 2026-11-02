@@ -8,7 +8,7 @@ import { Field, FormError, Input, PrimaryButton } from "../components/form";
 import { StatusBadge } from "../components/status-badge";
 import { Code } from "../components/code";
 import { useApplyConnection, useMe, useTrackApplication } from "../queries/portal";
-import { formatDate, formatKES } from "../lib/format";
+import { formatKES } from "../lib/format";
 import { cn } from "../lib/utils";
 
 function errorMessage(e: unknown) {
@@ -99,10 +99,10 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
           }}
         >
           <Field label="Full name" htmlFor="apply-name">
-            <Input id="apply-name" autoComplete="name" required minLength={2} value={form.fullName} onChange={set("fullName")} placeholder="e.g. Grace Wanjiru" />
+            <Input id="apply-name" autoComplete="name" required minLength={2} value={form.fullName} onChange={set("fullName")} placeholder="e.g. Jane Doe" />
           </Field>
           <Field label="Phone number" htmlFor="apply-phone" hint="We'll text updates to this number.">
-            <Input id="apply-phone" type="tel" inputMode="tel" autoComplete="tel" required value={form.phoneNumber} onChange={set("phoneNumber")} placeholder="0712 345 678" />
+            <Input id="apply-phone" type="tel" inputMode="tel" autoComplete="tel" required value={form.phoneNumber} onChange={set("phoneNumber")} placeholder="0712 000 000" />
           </Field>
           <Field label="Physical address" htmlFor="apply-address" hint="Plot number, street and area, plus a landmark if it helps.">
             <textarea
@@ -113,7 +113,7 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
               rows={3}
               value={form.physicalAddress}
               onChange={set("physicalAddress")}
-              placeholder="Plot 14, Kenyatta Rd, near St. Mary's school"
+              placeholder="e.g. Plot 12, Market Road, near the shopping centre"
               className="w-full resize-none rounded-lg border border-input bg-card px-3.5 py-2.5 text-[15px] placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
             />
           </Field>
@@ -145,7 +145,7 @@ function Timeline({ result }: { result: TrackResult }) {
         <CircleX className="mt-0.5 size-5 shrink-0 text-destructive" />
         <div>
           <p className="font-semibold text-foreground">Application not approved</p>
-          <p className="mt-1 text-sm text-muted-foreground">{result.rejectionReason ?? "Contact our office for details."}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Contact our office for details.</p>
         </div>
       </div>
     );
@@ -228,14 +228,11 @@ function TrackModal({ open, onClose, track, value, setValue }: {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-4">
               <div>
                 <Code className="text-base text-primary">{result.referenceNumber}</Code>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {result.applicant} · submitted {formatDate(result.submittedAt)}
-                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">Application status</p>
               </div>
               <StatusBadge status={result.status} />
             </div>
             <Timeline result={result} />
-            <p className="text-xs text-muted-foreground">Last updated {formatDate(result.updatedAt)}</p>
           </div>
         )}
       </div>
@@ -254,7 +251,7 @@ function HeroPanel() {
           <span className="font-mono text-sm font-semibold text-primary">REQ-0042</span>
           <StatusBadge status="APPROVED_PENDING_PAYMENT" />
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">Amina O. · Mwandi Estate, Plot 9</p>
+        <p className="mt-1 text-sm text-muted-foreground">Sample customer · Example estate</p>
         <div className="mt-6 space-y-3">
           {[
             { label: "Application submitted", done: true },

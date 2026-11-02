@@ -35,7 +35,8 @@ export type AppRouterClient = RouterClient<AppRouter>;
 const app = createApp(router);
 // Better Auth (incl. unified portal sign-in at /api/auth/portal/*)
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
-// M-Pesa STK callbacks (public, validated + idempotent) and PDF receipts (session-scoped).
+// M-Pesa STK callbacks (public, validated + idempotent) and PDF receipts
+// (full details for the owner/operators; masked copy for a signed-out link).
 app.post("/api/mpesa/callback", mpesaCallback);
 app.get("/api/receipts/:paymentId", receiptPdf);
 

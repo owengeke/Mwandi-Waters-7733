@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { maskCustomerName } from "./privacy";
 
 export interface ReceiptPdfInput {
   paymentId: number;
@@ -13,6 +14,8 @@ export interface ReceiptPdfInput {
   phoneNumber: string;
   invoiceNumber: string | null;
   isDemo: boolean;
+  /** Privacy-protected copy for links opened without a session. */
+  masked?: boolean;
 }
 
 const KES = new Intl.NumberFormat("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -30,6 +33,31 @@ const INK = rgb(0.043, 0.106, 0.18);
 const MUTED = rgb(0.357, 0.42, 0.498);
 const LINE = rgb(0.86, 0.9, 0.94);
 const PAPER = rgb(0.98, 0.988, 1);
+
+/**
+ * The detail rows on the receipt.
+ *
+ * A masked copy (opened without a session) shows "First L." instead of the full
+ * name and omits the phone, account and meter numbers, so a shared link cannot
+ * reveal a client's identity or account details.
+ */
+export function receiptDetailRows(input: ReceiptPdfInput): [string, string][] {
+  const date: [string, string] = ["Payment date", DATE.format(input.paidAt)];
+  const invoice: [string, string] = ["Invoice", input.invoiceNumber ?? "Account payment"];
+
+  if (input.masked) {
+    return [["Customer", maskCustomerName(input.customerName)], invoice, date];
+  }
+
+  return [
+    ["Account number", input.accountNumber],
+    ["Meter number", input.meterNumber],
+    ["Customer", input.customerName],
+    ["Phone number", input.phoneNumber],
+    invoice,
+    date,
+  ];
+}
 
 /** A one-page A4 PDF receipt, generated server-side with pdf-lib. */
 export async function renderReceiptPdf(input: ReceiptPdfInput) {
@@ -67,14 +95,7 @@ export async function renderReceiptPdf(input: ReceiptPdfInput) {
   page.drawText(input.mpesaReference ?? "—", { x: width - 64 - mono.widthOfTextAtSize(input.mpesaReference ?? "—", 14), y: y - 46, size: 14, font: mono, color: INK });
   page.drawText("M-Pesa reference", { x: width - 64 - font.widthOfTextAtSize("M-Pesa reference", 9), y: y - 62, size: 9, font, color: MUTED });
 
-  const rows: [string, string][] = [
-    ["Account number", input.accountNumber],
-    ["Meter number", input.meterNumber],
-    ["Customer", input.customerName],
-    ["Phone number", input.phoneNumber],
-    ["Invoice", input.invoiceNumber ?? "Account payment"],
-    ["Payment date", DATE.format(input.paidAt)],
-  ];
+  const rows = receiptDetailRows(input);
 
   y -= 118;
   page.drawText("Payment details", { x: 48, y, size: 12, font: bold, color: INK });
@@ -92,7 +113,12 @@ export async function renderReceiptPdf(input: ReceiptPdfInput) {
   // Notes + footer
   y -= 36;
   page.drawText("This is an official receipt for a payment received by Mwandi Waters.", { x: 48, y, size: 9, font, color: MUTED });
-  page.drawText("Keep it for your records. Payments are applied to the oldest outstanding bill on your account.", { x: 48, y: y - 14, size: 9, font, color: MUTED });
+  page.drawText(
+    input.masked
+      ? "Privacy-protected copy. Sign in to your account to view the full receipt."
+      : "Keep it for your records. Payments are applied to the oldest outstanding bill on your account.",
+    { x: 48, y: y - 14, size: 9, font, color: MUTED },
+  );
 
   page.drawLine({ start: { x: 48, y: 74 }, end: { x: width - 48, y: 74 }, thickness: 0.7, color: LINE });
   page.drawText("Mwandi Waters · Customer care · www.mwandiwaters.co.ke", { x: 48, y: 56, size: 8, font, color: MUTED });
