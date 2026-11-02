@@ -215,3 +215,86 @@ turso db copy mwandi-waters mwandi-waters-migration-test
 Then start from Step 1 on the fresh copy.
 
 **Never** run the migration script a second time on a database that already has `__new_invoices` or is missing `invoices` — it will abort with "table already exists" or corrupt data.
+
+---
+
+# Hosted Database Migration (0004) — Meter Readings
+
+Migration 0004 replaces fixed billing cycles with physical meter readings. It is
+**non-destructive**: it does not rebuild any table, so there is no
+`__new_invoices`, no FK toggling and no backup table. Every statement runs as
+its own `client.execute()` call so a failure points at exactly one line.
+
+**What it does**
+
+1. `CREATE TABLE meter_readings` (+ 4 indexes / checks).
+2. `DROP INDEX invoices_client_period_idx` and recreate it **non-unique** — a
+   client can now have more than one invoice in a day.
+3. Backfill: one opening row per client with invoices (`reading_value = 0`,
+   `units_consumed = 0`, dated the day before their first invoice), then one
+   billed row per invoice carrying its `consumption_units` on a synthetic
+   cumulative chain. Invoices are **never** modified.
+
+**Status: applied to production `mwandi-waters-restored` on 2026-11-02 — PASS.**
+
+## Recommended workflow
+
+```bash
+# Safety: read-only export of the hosted DB to a local file (includes indexes)
+cd packages/web
+bun scripts/run-hosted.ts export-hosted-snapshot.ts SNAPSHOT_PATH=C:\temp\pre-0004.db
+
+# Rehearse against a copy of that snapshot (must not be a libsql:// URL)
+bun scripts/run-hosted.ts migrate-hosted-0004.ts \
+  DATABASE_URL=file:C:\temp\dry-run.db CONFIRM_HOSTED_MIGRATION=yes ALLOW_LOCAL_FILE=true
+
+# Apply to production
+bun scripts/run-hosted.ts migrate-hosted-0004.ts CONFIRM_HOSTED_MIGRATION=yes
+```
+
+`scripts/run-hosted.ts` is a local helper that loads `HOSTED_DATABASE_URL` /
+`HOSTED_DATABASE_AUTH_TOKEN` from the root `.env` into `DATABASE_URL` /
+`DATABASE_AUTH_TOKEN`. If you prefer the documented environment style:
+
+```bash
+DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... CONFIRM_HOSTED_MIGRATION=yes \
+  bun run db:migrate-hosted-0004
+```
+
+## Verification performed automatically
+
+The script aborts unless all of these hold:
+
+- `meter_readings` did not exist before the run (re-running is refused).
+- Invoice and payment counts are unchanged.
+- `meter_readings` billed rows == invoice count.
+- Per-client reading units == sum of invoice `consumption_units`.
+- Every client with invoices has exactly one opening row.
+- The newest reading satisfies `previous + units = value`.
+- `PRAGMA foreign_key_check` is empty.
+- `invoices_client_period_idx` is non-unique afterwards.
+
+## What could not be backfilled
+
+- **Absolute meter numbers.** The real dial values were never stored, so the
+  chain is synthesised with `opening = 0`. The first opening reading shown to a
+  client is therefore 0, and their first historical invoice appears as "starting
+  from 0".
+- **Clients with no invoices** get no rows and must have an opening reading set
+  manually on `/admin/usage`. The run reports them by account number.
+
+## If it fails midway
+
+There is no table rebuild, so recovery is limited to the failed statement:
+
+| Failed at | State | Recovery |
+|-----------|-------|----------|
+| Index swap (`DROP`/`CREATE INDEX`) | `invoices` intact, period index possibly missing | Re-run the `CREATE INDEX invoices_client_period_idx ...` statement (non-unique) |
+| Backfill `INSERT` | Tables and indexes complete | Re-run the two `INSERT OR IGNORE` statements; they are idempotent |
+| `CREATE TABLE meter_readings` | Nothing changed | Re-run from the start |
+
+Because the backfill uses `INSERT OR IGNORE` with a unique
+`(client_id, reading_date, reading_value)` guard, re-running it is safe. If
+`invoices_client_period_idx` is ever lost, recreate it with
+`CREATE INDEX invoices_client_period_idx ON invoices (client_id, billing_period_start);`
+(non-unique).
