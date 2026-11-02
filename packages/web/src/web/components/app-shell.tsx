@@ -1,19 +1,29 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ClipboardList, LayoutDashboard, LogOut, Menu, ReceiptText, Users, Wallet, X } from "lucide-react";
+import {
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
 import { ThemeSwitcher, ThemeToggle } from "./theme-switcher";
 import { cn } from "../lib/utils";
 import { useMe, useSignOut } from "../queries/portal";
 import { ROLE_LABEL } from "../lib/roles";
 
 const NAV = [
-  { href: "/", label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/installations", label: "Installations", Icon: ClipboardList },
-  { href: "/clients", label: "Clients", Icon: Users },
-  { href: "/invoices", label: "Invoices", Icon: ReceiptText },
-  { href: "/payments", label: "Payments", Icon: Wallet },
-  { href: "/usage", label: "Usage", Icon: ReceiptText },
-];
+  { href: "/", label: "Dashboard", Icon: LayoutDashboard, color: "text-primary" },
+  { href: "/installations", label: "Installations", Icon: ClipboardList, color: "text-[#ea580c]" },
+  { href: "/clients", label: "Clients", Icon: Users, color: "text-[#7c3aed]" },
+  { href: "/invoices", label: "Invoices", Icon: FileText, color: "text-[#0891b2]" },
+  { href: "/payments", label: "Payments", Icon: Wallet, color: "text-[#059669]" },
+  { href: "/usage", label: "Meter readings", Icon: BarChart3, color: "text-[#db2777]" },
+] as const;
 
 export function BrandMark({ className }: { className?: string }) {
   return (
@@ -48,7 +58,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Main">
-      {NAV.map(({ href, label, Icon }) => {
+      {NAV.map(({ href, label, Icon, color }) => {
         const active = href === "/" ? location === "/" : location.startsWith(href);
         return (
           <Link
@@ -57,19 +67,29 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "group flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                : "text-foreground/80 hover:bg-muted hover:text-foreground",
             )}
           >
-            {active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary" />}
-            <Icon className={cn("size-4", active ? "text-primary" : "")} />
-            {label}
+            <Icon className={cn("size-[18px] shrink-0", color)} aria-hidden />
+            <span className="truncate">{label}</span>
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+function TariffBox() {
+  return (
+    <div className="rounded-xl bg-primary/10 px-4 py-3 dark:bg-primary/15">
+      <p className="text-[11px] font-medium text-muted-foreground">Flat tariff</p>
+      <p className="mt-0.5 font-display text-[15px] font-bold text-foreground">
+        KES 150 <span className="text-[11px] font-medium text-muted-foreground">per unit</span>
+      </p>
+    </div>
   );
 }
 
@@ -85,8 +105,8 @@ function Account() {
     .join("")
     .toUpperCase();
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-bold text-primary">
+    <div className="flex items-center gap-3 rounded-xl border bg-card p-2.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-bold text-primary">
         {initials}
       </span>
       <div className="min-w-0 flex-1 leading-tight">
@@ -99,7 +119,7 @@ function Account() {
         title="Sign out"
         disabled={signOut.isPending}
         onClick={() => signOut.mutate(undefined, { onSettled: () => navigate("~/login", { replace: true }) })}
-        className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
       >
         <LogOut className="size-4" />
       </button>
@@ -110,24 +130,24 @@ function Account() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="min-h-dvh lg:pl-[248px]">
+    <div className="min-h-dvh lg:pl-[264px]">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex">
         <div className="px-1">
           <Brand />
         </div>
-        <div className="mt-8 flex-1">
+        <div className="mt-7 flex-1">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Operations
           </p>
           <NavLinks />
         </div>
         <div className="space-y-3 border-t border-sidebar-border pt-4">
-          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Appearance</p>
-          <ThemeSwitcher />
-          <p className="px-1 text-[11px] text-muted-foreground">
-            Tariff <span className="font-mono text-foreground">KES 150</span> / unit
+          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Appearance
           </p>
+          <ThemeSwitcher />
+          <TariffBox />
           <Account />
         </div>
       </aside>
@@ -136,12 +156,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
         <Brand />
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <ThemeToggle className="size-11" />
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
-            className="inline-flex size-9 items-center justify-center rounded-lg border bg-card"
+            className="inline-flex size-11 items-center justify-center rounded-lg border bg-card"
           >
             <Menu className="size-4" />
           </button>
@@ -154,7 +174,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-y-0 left-0 flex w-72 flex-col bg-sidebar p-5 shadow-xl animate-in slide-in-from-left duration-200">
             <div className="flex items-center justify-between">
               <Brand />
-              <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="p-1">
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setOpen(false)}
+                className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"
+              >
                 <X className="size-4" />
               </button>
             </div>
@@ -163,13 +188,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="space-y-3">
               <ThemeSwitcher />
+              <TariffBox />
               <Account />
             </div>
           </div>
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-[1280px] px-5 py-8 md:px-10 md:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1360px] px-5 py-7 md:px-8 md:py-9">{children}</main>
     </div>
   );
 }

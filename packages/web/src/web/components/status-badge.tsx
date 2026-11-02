@@ -15,7 +15,7 @@ const TONES: Record<string, Tone> = {
   SUSPENDED: "warning",
   DISCONNECTED: "danger",
   // invoice
-  UNPAID: "neutral",
+  UNPAID: "warning",
   PARTIALLY_PAID: "warning",
   OVERDUE: "danger",
 };

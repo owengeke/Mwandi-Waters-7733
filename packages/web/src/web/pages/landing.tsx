@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowRight, Check, CircleX, ClipboardCheck, Droplets, Phone, Search, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { ArrowRight, Check, CircleX, Search } from "lucide-react";
 import { BrandMark } from "../components/app-shell";
 import { ThemeToggle } from "../components/theme-switcher";
 import { Modal } from "../components/modal";
 import { Field, FormError, Input, PrimaryButton } from "../components/form";
 import { StatusBadge } from "../components/status-badge";
-import { Code } from "../components/code";
 import { useApplyConnection, useMe, useTrackApplication } from "../queries/portal";
 import { formatKES } from "../lib/format";
 import { cn } from "../lib/utils";
@@ -17,30 +16,43 @@ function errorMessage(e: unknown) {
 
 /* ---------------- Navbar ---------------- */
 
-function Navbar() {
+function Navbar({ onTrack }: { onTrack: () => void }) {
   const me = useMe();
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5 md:px-8">
-        <Link to="/" className="flex items-center gap-2.5">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur-md">
+      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-2 px-5 md:px-8 sm:gap-4">
+        <Link to="/" className="flex shrink-0 items-center gap-2.5">
           <BrandMark className="size-8" />
-          <span className="font-display text-[17px] font-bold tracking-tight text-foreground">Mwandi Waters</span>
+          <span className="whitespace-nowrap font-display text-[16px] font-bold tracking-tight text-foreground sm:text-[17px]">
+            Mwandi Waters
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
+        <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex" aria-label="Site">
+          <a href="#how-it-works" className="transition-colors hover:text-foreground">
+            How it works
+          </a>
+          <Link to="/login" className="transition-colors hover:text-foreground">
+            Pay your bill
+          </Link>
+          <button type="button" onClick={onTrack} className="transition-colors hover:text-foreground">
+            Track application
+          </button>
+        </nav>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+          <ThemeToggle className="size-11" />
           {me.data ? (
             <Link
               to={me.data.home}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4 sm:text-sm"
             >
-              Go to dashboard <ArrowRight className="size-3.5" />
+              Dashboard <ArrowRight className="hidden size-3.5 sm:block" />
             </Link>
           ) : (
             <Link
               to="/login"
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              className="inline-flex h-11 items-center rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:px-5 sm:text-sm"
             >
-              Sign In
+              Sign in
             </Link>
           )}
         </div>
@@ -78,7 +90,7 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
         <div className="space-y-6">
           <div className="rounded-xl border border-primary/25 bg-primary/6 p-5 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Your reference number</p>
-            <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-primary">{ref}</p>
+            <p className="mt-2 font-display text-3xl font-semibold tracking-tight text-primary">{ref}</p>
             <p className="mt-2 text-sm text-muted-foreground">Keep this — you'll need it to track your application.</p>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -119,7 +131,7 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
           </Field>
           <FormError>{apply.error ? errorMessage(apply.error) : null}</FormError>
           <PrimaryButton type="submit" loading={apply.isPending} className="w-full">
-            {apply.isPending ? "Submitting…" : "Submit application"}
+            {apply.isPending ? "Submitting..." : "Submit application"}
           </PrimaryButton>
         </form>
       )}
@@ -213,7 +225,7 @@ function TrackModal({ open, onClose, track, value, setValue }: {
           required
           autoComplete="off"
           spellCheck={false}
-          className="font-mono tracking-tight"
+          className="tracking-tight"
         />
         <PrimaryButton type="submit" loading={track.isPending} className="shrink-0">
           {!track.isPending && <Search className="size-4" />}
@@ -227,7 +239,7 @@ function TrackModal({ open, onClose, track, value, setValue }: {
           <div className="rise space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-4">
               <div>
-                <Code className="text-base text-primary">{result.referenceNumber}</Code>
+                <span className="text-base font-semibold text-primary">{result.referenceNumber}</span>
                 <p className="mt-0.5 text-sm text-muted-foreground">Application status</p>
               </div>
               <StatusBadge status={result.status} />
@@ -240,56 +252,114 @@ function TrackModal({ open, onClose, track, value, setValue }: {
   );
 }
 
-/* ---------------- Page ---------------- */
+/* ---------------- Hero ---------------- */
+
+const HERO_STEPS = [
+  { label: "Application submitted", done: true, current: false, detail: null },
+  { label: "Site survey approved", done: true, current: false, detail: null },
+  { label: "Installation fee", done: false, current: true, detail: "KES 6,500.00 due" },
+  { label: "Meter installed", done: false, current: false, detail: null },
+] as const;
 
 function HeroPanel() {
   return (
-    <div className="relative mx-auto w-full max-w-[440px]" aria-hidden>
-      <div className="absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-primary/25 via-primary/5 to-transparent blur-2xl" />
-      <div className="relative rounded-2xl border bg-card/90 p-6 shadow-xl backdrop-blur">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-sm font-semibold text-primary">REQ-0042</span>
-          <StatusBadge status="APPROVED_PENDING_PAYMENT" />
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">Sample customer · Example estate</p>
-        <div className="mt-6 space-y-3">
-          {[
-            { label: "Application submitted", done: true },
-            { label: "Site survey approved", done: true },
-            { label: "Installation fee · KES 6,500.00", done: false },
-            { label: "Meter installed", done: false },
-          ].map((s, i) => (
-            <div key={s.label} className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "flex size-5 items-center justify-center rounded-full border-2",
-                  s.done ? "border-primary bg-primary text-primary-foreground" : i === 2 ? "border-primary" : "border-border",
+    <div className="relative mx-auto w-full max-w-[520px]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[min(130%,640px)] -translate-x-1/2 -translate-y-1/2"
+      >
+        <div className="absolute inset-[6%] rounded-full border border-primary/12" />
+        <div className="absolute inset-[19%] rounded-full border border-primary/12" />
+        <div className="absolute inset-[32%] rounded-full border border-primary/12" />
+      </div>
+
+      <figure className="relative">
+        <div className="rounded-2xl border bg-card p-6 shadow-[0_24px_70px_-40px_rgba(11,27,46,0.45)]">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-display text-[17px] font-bold tracking-tight text-foreground">
+              Application REQ-0042
+            </p>
+            <span className="shrink-0 rounded-full bg-[#fef3c7] px-2.5 py-1 text-[11px] font-semibold text-[#b45309] dark:bg-amber-500/15 dark:text-amber-300">
+              Awaiting payment
+            </span>
+          </div>
+
+          <ol className="mt-6">
+            {HERO_STEPS.map((step, i) => (
+              <li key={step.label} className="relative flex gap-3.5 pb-5 last:pb-0">
+                {i < HERO_STEPS.length - 1 && (
+                  <span
+                    className={cn(
+                      "absolute left-[10px] top-6 h-[calc(100%-1.25rem)] w-0.5",
+                      i < 2 ? "bg-primary" : "bg-border",
+                    )}
+                    aria-hidden
+                  />
                 )}
-              >
-                {s.done && <Check className="size-3" strokeWidth={3} />}
-              </span>
-              <span className={cn("text-sm", s.done || i === 2 ? "font-medium text-foreground" : "text-muted-foreground")}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 flex items-center gap-3 rounded-xl bg-primary/8 p-3.5">
-          <Wallet className="size-5 text-primary" />
-          <div className="text-xs">
+                <span
+                  className={cn(
+                    "relative z-10 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 bg-card",
+                    step.done && "border-primary bg-primary text-primary-foreground",
+                    !step.done && step.current && "border-primary",
+                    !step.done && !step.current && "border-border",
+                  )}
+                >
+                  {step.done && <Check className="size-3" strokeWidth={3} />}
+                </span>
+                <div className="-mt-0.5">
+                  <p
+                    className={cn(
+                      "text-[15px] font-semibold",
+                      step.done || step.current ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {step.label}
+                  </p>
+                  {step.detail && <p className="text-sm text-muted-foreground">{step.detail}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-6 rounded-xl bg-[#eaf5fc] px-4 py-3.5 dark:bg-primary/10">
             <p className="font-semibold text-foreground">Pay with M-Pesa</p>
-            <p className="text-muted-foreground">Paybill <span className="font-mono text-foreground">522 533</span> · Acc <span className="font-mono text-foreground">REQ-0042</span></p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Paybill <span className="font-semibold text-foreground">522 533</span>, account number{" "}
+              <span className="font-semibold text-foreground">REQ-0042</span>
+            </p>
           </div>
         </div>
-      </div>
+        <figcaption className="mt-4 text-center text-sm text-muted-foreground">
+          An example of what you see when you track an application.
+        </figcaption>
+      </figure>
     </div>
   );
 }
 
-const HOW = [
-  { Icon: ClipboardCheck, title: "Apply online", body: "Two minutes, no office visit. You get a REQ number on the spot." },
-  { Icon: ShieldCheck, title: "Site review", body: "A surveyor checks the line and confirms your installation fee." },
-  { Icon: Wallet, title: "Pay by M-Pesa", body: "Settle the fee from your phone — the status updates automatically." },
-  { Icon: Wrench, title: "Get connected", body: "Our team installs the meter and your account goes live." },
+const FACTS = [
+  {
+    title: "One flat rate",
+    body: "KES 150 per unit. No tiers and no surprises on your bill.",
+  },
+  {
+    title: "Pay by M-Pesa",
+    body: "Use Paybill 522 533 with your account number, or pay online.",
+  },
+  {
+    title: "Bills on WhatsApp",
+    body: "Get every invoice and receipt on your phone as soon as it is issued.",
+  },
 ];
+
+const HOW = [
+  { title: "Apply online", body: "Tell us who you are and where the property is." },
+  { title: "Site survey", body: "Our team visits and approves the connection." },
+  { title: "Pay the fee", body: "Pay the installation fee by M-Pesa Paybill." },
+  { title: "Meter installed", body: "You get your account number and can sign in." },
+];
+
+/* ---------------- Page ---------------- */
 
 export const Landing = function Landing() {
   const [applyOpen, setApplyOpen] = useState(false);
@@ -297,45 +367,42 @@ export const Landing = function Landing() {
   const [trackRef, setTrackRef] = useState("");
   const track = useTrackApplication();
 
+  const openTrack = () => setTrackOpen(true);
+
   return (
     <div className="min-h-dvh bg-background">
-      <Navbar />
+      <Navbar onTrack={openTrack} />
 
       <main>
         <section className="relative overflow-hidden">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-70 [background:radial-gradient(60%_50%_at_85%_10%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_70%)]"
-            aria-hidden
-          />
-          <div className="relative mx-auto grid max-w-[1200px] items-center gap-14 px-5 pb-20 pt-14 md:px-8 md:pt-20 lg:grid-cols-[1.1fr_1fr] lg:pb-28">
+          <div className="relative mx-auto grid max-w-[1280px] items-center gap-12 px-5 pb-14 pt-12 md:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-20 lg:pt-16">
             <div className="rise">
-              <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
-                <Droplets className="size-3.5 text-primary" /> Serving Mwandi and surrounding estates
-              </p>
-              <h1 className="mt-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-tight text-foreground md:text-[3.5rem]">
+              <h1 className="font-display text-[2.2rem] font-bold leading-[1.04] tracking-tight text-foreground sm:text-[2.8rem] lg:text-[3.5rem]">
                 Water Connection Services <span className="text-primary">Made Simple</span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-                Apply for a new connection, follow every step from survey to meter installation, and manage your bills — all from your phone.
+              <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+                Apply for a new connection, follow every step from survey to meter installation, and manage your bills from your phone.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <PrimaryButton type="button" onClick={() => setApplyOpen(true)} className="h-12 px-6 text-[15px]">
-                  Apply for New Connection <ArrowRight className="size-4" />
-                </PrimaryButton>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setTrackOpen(true);
-                  }}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border bg-card px-6 text-[15px] font-semibold text-foreground hover:bg-muted"
+                  onClick={() => setApplyOpen(true)}
+                  className="inline-flex h-12 items-center justify-center rounded-lg bg-primary px-6 text-[15px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                 >
-                  <Search className="size-4" /> Track Application
+                  Apply for New Connection
+                </button>
+                <button
+                  type="button"
+                  onClick={openTrack}
+                  className="inline-flex h-12 items-center justify-center rounded-lg border bg-card px-6 text-[15px] font-semibold text-foreground transition-colors hover:bg-muted"
+                >
+                  Track Application
                 </button>
               </div>
               <p className="mt-6 text-sm text-muted-foreground">
                 Already a customer?{" "}
                 <Link to="/login" className="font-semibold text-primary hover:underline">
-                  Sign in with your phone or ACC number
+                  Sign in with your phone or account number
                 </Link>
               </p>
             </div>
@@ -345,36 +412,57 @@ export const Landing = function Landing() {
           </div>
         </section>
 
-        <section className="border-t bg-card/50">
-          <div className="mx-auto max-w-[1200px] px-5 py-16 md:px-8 md:py-20">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">How it works</p>
-            <h2 className="mt-2 max-w-lg text-2xl font-bold text-foreground md:text-3xl">From application to running water in four steps</h2>
-            <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {HOW.map(({ Icon, title, body }, i) => (
-                <div key={title} className="rounded-xl border bg-card p-5">
-                  <div className="flex items-center justify-between">
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">0{i + 1}</span>
-                  </div>
-                  <h3 className="mt-4 font-semibold text-foreground">{title}</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">{body}</p>
-                </div>
-              ))}
+        <section id="pay-your-bill" className="mx-auto max-w-[1280px] scroll-mt-24 px-5 md:px-8">
+          <div className="grid divide-y rounded-xl border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            {FACTS.map((fact) => (
+              <div key={fact.title} className="p-6">
+                <h2 className="font-display text-[17px] font-bold text-foreground">{fact.title}</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{fact.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="how-it-works" className="mx-auto max-w-[1280px] scroll-mt-24 px-5 pt-16 md:px-8 md:pt-20">
+          <h2 className="font-display text-[1.75rem] font-bold tracking-tight text-foreground md:text-[2rem]">
+            How a new connection works
+          </h2>
+          <div className="mt-8 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            {HOW.map((step, i) => (
+              <div key={step.title} className="border-t-2 border-primary pt-4">
+                <p className="text-sm font-semibold text-primary">{i + 1}</p>
+                <h3 className="mt-1 font-display text-[17px] font-bold text-foreground">{step.title}</h3>
+                <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-16 bg-[#0b1b2e] py-14 md:mt-20">
+          <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-5 md:flex-row md:items-center md:justify-between md:px-8">
+            <div>
+              <h2 className="font-display text-[1.75rem] font-bold tracking-tight text-white md:text-[2rem]">
+                Ready to get connected?
+              </h2>
+              <p className="mt-2 text-[15px] text-white/75">
+                Apply in a few minutes. We will keep you updated on WhatsApp.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setApplyOpen(true)}
+              className="inline-flex h-12 shrink-0 items-center justify-center rounded-lg bg-[#38bdf8] px-6 text-[15px] font-semibold text-[#062033] transition-colors hover:bg-[#7dd3fc]"
+            >
+              Apply for New Connection
+            </button>
           </div>
         </section>
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-5 py-8 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-8">
-          <span className="flex items-center gap-2">
-            <BrandMark className="size-5" /> © {new Date().getFullYear()} Mwandi Waters
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Phone className="size-3.5" /> Customer care <span className="font-mono text-foreground">0700 000 100</span>
-          </span>
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-2 px-5 py-8 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-8">
+          <span>Mwandi Waters. Clean &amp; Reliable Water Services.</span>
+          <span>Serving Mwandi and surrounding estates.</span>
         </div>
       </footer>
 
