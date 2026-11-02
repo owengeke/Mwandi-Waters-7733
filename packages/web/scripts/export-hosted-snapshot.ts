@@ -102,6 +102,22 @@ for (const table of tables) {
   console.log(`    ${batchCount} rows`);
 }
 
+// Copy indexes, views and triggers (DDL only) so the snapshot mirrors the
+// hosted schema — required to rehearse index-changing migrations locally.
+const ddl = await hosted.execute(`
+  SELECT name, type, sql FROM sqlite_master
+  WHERE type IN ('index','view','trigger') AND sql IS NOT NULL
+  ORDER BY CASE type WHEN 'index' THEN 0 WHEN 'view' THEN 1 ELSE 2 END, name
+`);
+for (const obj of ddl.rows as Array<{ name: string; type: string; sql: string }>) {
+  try {
+    local.run(obj.sql);
+    console.log(`  + ${obj.type} ${obj.name}`);
+  } catch (e: any) {
+    console.error(`  ! ${obj.type} ${obj.name}: ${e.message}`);
+  }
+}
+
 local.run("PRAGMA wal_checkpoint(TRUNCATE)");
 
 // Validate
