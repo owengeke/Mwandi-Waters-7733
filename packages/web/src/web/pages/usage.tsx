@@ -67,9 +67,6 @@ export default function UsagePage() {
       setError("Enter a valid unit count.");
       return;
     }
-    if (u === 0 && !window.confirm("Issue invoice with 0 units? This will create a KES 0 invoice.")) {
-      return;
-    }
     issue.mutate(
       { clientId, month, half, consumptionUnits: u },
       {
