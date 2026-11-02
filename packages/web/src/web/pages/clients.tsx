@@ -55,7 +55,7 @@ function AddClientBody({ onClose }: { onClose: () => void }) {
     }
     const phone = phoneNumber.trim();
     if (!/^\+?254\d{9}$/.test(phone.replace(/\s+/g, ""))) {
-      setError("Enter a Kenyan phone number, e.g. +254712345678.");
+      setError("Enter a Kenyan phone number, e.g. +254712000000.");
       return;
     }
     const meter = meterNumber.trim().toUpperCase();
@@ -122,7 +122,7 @@ function AddClientBody({ onClose }: { onClose: () => void }) {
           id="client-phone"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
-          placeholder="+254712345678"
+          placeholder="+254712000000"
           disabled={busy}
         />
       </Field>

@@ -129,7 +129,7 @@ export function PaymentDialog({
       return;
     }
     if (!isKenyanPhone(phone)) {
-      setPhoneError("Enter a valid Kenyan number, e.g. 0712 345 678.");
+      setPhoneError("Enter a valid Kenyan number, e.g. 0712 000 000.");
       return;
     }
     if (amountError) return;
@@ -380,7 +380,7 @@ export function PaymentDialog({
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="0712 345 678"
+              placeholder="0712 000 000"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               invalid={Boolean(phoneError)}
