@@ -6,11 +6,32 @@ import { Modal } from "../components/modal";
 import { Code } from "../components/code";
 import { StatusBadge } from "../components/status-badge";
 import { useUsage, useIssueUsage, useBulkUsage, useCorrectUsage } from "../queries/usage";
-import { formatKES } from "../lib/format";
+import { formatDate, formatKES, formatUnits } from "../lib/format";
+import { cn } from "../lib/utils";
+import { type UsageHalf, windowFor } from "../../api/lib/usage-period";
+
+const HALVES: Array<{ value: UsageHalf; label: string }> = [
+  { value: "FIRST", label: "1st – 15th" },
+  { value: "SECOND", label: "16th – end" },
+];
+
+const todayMonth = () => new Date().toISOString().slice(0, 7);
+const currentHalf = (): UsageHalf => (new Date().getDate() <= 15 ? "FIRST" : "SECOND");
+
+/** Non-blocking sanity check before issuing a reading. */
+function readingWarning(units: number, previousUnits: number | null): string | null {
+  if (!Number.isFinite(units)) return null;
+  if (units === 0) return "0 units — double-check the meter";
+  if (previousUnits !== null && previousUnits > 0 && units > previousUnits * 3) {
+    return `${(units / previousUnits).toFixed(1)}× the previous reading`;
+  }
+  return null;
+}
 
 export default function UsagePage() {
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const q = useUsage(month);
+  const [month, setMonth] = useState(todayMonth);
+  const [half, setHalf] = useState<UsageHalf>(currentHalf);
+  const q = useUsage(month, half);
   const issue = useIssueUsage();
   const bulk = useBulkUsage();
   const correct = useCorrectUsage();
@@ -20,11 +41,18 @@ export default function UsagePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
-  const [bulkConfirmRows, setBulkConfirmRows] = useState<Array<{ clientId: number; units: number; preview: number; name: string; account: string }>>([]);
+  const [bulkConfirmRows, setBulkConfirmRows] = useState<
+    Array<{ clientId: number; units: number; preview: number; name: string; account: string; warning: string | null }>
+  >([]);
 
   const data = q.data;
   const tariff = data?.tariffPerUnitKes ?? 150;
-  const maxMonth = new Date().toISOString().slice(0, 7);
+  const maxMonth = todayMonth();
+  const activeWindow = data?.window ?? windowFor(month, half);
+  const windowText =
+    "label" in activeWindow && typeof activeWindow.label === "string"
+      ? activeWindow.label
+      : `${activeWindow.start} – ${activeWindow.end}`;
 
   function onUnitsChange(clientId: number, v: string) {
     setDraftUnits((d) => ({ ...d, [clientId]: v }));
@@ -43,7 +71,7 @@ export default function UsagePage() {
       return;
     }
     issue.mutate(
-      { clientId, month, consumptionUnits: u },
+      { clientId, month, half, consumptionUnits: u },
       {
         onSuccess: () => {
           setSuccess(`Issued for client ${clientId}.`);
@@ -62,20 +90,32 @@ export default function UsagePage() {
     setError(null);
     setSuccess(null);
     if (!data) return;
-    const rows = data.clients
-      .filter((c) => c.invoice === null)
-      .map((c) => {
-        const raw = draftUnits[c.client.id] ?? "0";
-        const u = Number(raw);
-        return {
-          clientId: c.client.id,
-          units: Number.isFinite(u) && u >= 0 ? u : 0,
-          preview: (Number.isFinite(u) && u >= 0 ? u : 0) * tariff,
-          name: c.client.fullName,
-          account: c.client.accountNumber,
-        };
-      })
-      .filter((r) => r.units > 0 || r.preview >= 0);
+    const rows: Array<{
+      clientId: number;
+      units: number;
+      preview: number;
+      name: string;
+      account: string;
+      warning: string | null;
+    }> = [];
+    for (const c of data.clients) {
+      if (c.invoice) continue;
+      const raw = draftUnits[c.client.id];
+      if (raw === undefined || raw.trim() === "") continue;
+      const u = Number(raw);
+      if (!Number.isFinite(u) || u < 0) {
+        setError(`Enter a valid unit count for ${c.client.fullName}.`);
+        return;
+      }
+      rows.push({
+        clientId: c.client.id,
+        units: u,
+        preview: Math.round(u * tariff * 100) / 100,
+        name: c.client.fullName,
+        account: c.client.accountNumber,
+        warning: readingWarning(u, c.previous?.units ?? null),
+      });
+    }
     if (rows.length === 0) {
       setError("Nothing to issue — enter units for at least one unissued client.");
       return;
@@ -88,7 +128,7 @@ export default function UsagePage() {
     if (!data) return;
     const rows = bulkConfirmRows.map((r) => ({ clientId: r.clientId, consumptionUnits: r.units }));
     bulk.mutate(
-      { month, rows },
+      { month, half, rows },
       {
         onSuccess: (res: any) => {
           setSuccess(`Issued ${res?.count ?? rows.length} invoice(s).`);
@@ -127,13 +167,14 @@ export default function UsagePage() {
 
   const totalUnits = bulkConfirmRows.reduce((s, r) => s + r.units, 0);
   const totalPreview = bulkConfirmRows.reduce((s, r) => s + r.preview, 0);
+  const warnCount = bulkConfirmRows.filter((r) => r.warning).length;
 
   return (
     <>
       <PageHeader
         eyebrow="Billing"
-        title="Monthly usage"
-        description="Issue each client's water usage for a billing month. One invoice per client per month; rate snapshot per invoice."
+        title="Usage readings"
+        description="Issue each client's water usage for a 15-day reporting window. One invoice per client per window; the rate is captured on every invoice."
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -141,23 +182,53 @@ export default function UsagePage() {
           Billing month
           <input
             type="month"
+            aria-label="Billing month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
             max={maxMonth}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
+            className="h-11 rounded-md border bg-background px-3 text-sm"
           />
         </label>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Window</span>
+          <fieldset className="flex rounded-md border p-0.5">
+            <legend className="sr-only">Reporting window</legend>
+            {HALVES.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={half === option.value}
+                onClick={() => {
+                  setHalf(option.value);
+                  setEditing(null);
+                }}
+                className={cn(
+                  "h-11 rounded px-3 text-sm font-medium transition-colors",
+                  half === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </fieldset>
+        </div>
+
         <div className="text-sm text-muted-foreground">
+          <span className="hidden sm:inline">{windowText} · </span>
           Tariff <span className="font-mono text-foreground">KES {tariff}</span> / unit
         </div>
         <Button onClick={prepareBulkConfirm} disabled={bulk.isPending || q.isLoading}>
           {bulk.isPending ? "Issuing…" : "Issue all pending"}
         </Button>
+
         <Modal
           open={bulkConfirmOpen}
           onClose={() => setBulkConfirmOpen(false)}
           title="Confirm bulk issue"
-          description={`${bulkConfirmRows.length} client(s), ${totalUnits.toFixed(2)} units, ${formatKES(totalPreview)} total.`}
+          description={`${bulkConfirmRows.length} client(s), ${totalUnits.toFixed(2)} units, ${formatKES(totalPreview)} total for ${windowText}.`}
         >
           <div className="max-h-60 overflow-auto mb-4 text-sm">
             <table className="w-full text-left">
@@ -171,9 +242,12 @@ export default function UsagePage() {
               </thead>
               <tbody>
                 {bulkConfirmRows.map((r) => (
-                  <tr key={r.clientId} className="border-b">
+                  <tr key={r.clientId} className="border-b align-top">
                     <td className="py-2"><Code>{r.account}</Code></td>
-                    <td className="py-2">{r.name}</td>
+                    <td className="py-2">
+                      {r.name}
+                      {r.warning && <p className="text-[11px] font-medium text-warning">{r.warning}</p>}
+                    </td>
                     <td className="py-2 text-right font-mono">{r.units.toFixed(2)}</td>
                     <td className="py-2 text-right font-mono">{formatKES(r.preview)}</td>
                   </tr>
@@ -186,6 +260,11 @@ export default function UsagePage() {
               </tbody>
             </table>
           </div>
+          {warnCount > 0 && (
+            <p className="mb-3 text-xs font-medium text-warning">
+              {warnCount} reading(s) look unusual — 0 units or more than 3× the previous reading. You can still issue them.
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setBulkConfirmOpen(false)}>
               Cancel
@@ -199,6 +278,11 @@ export default function UsagePage() {
 
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
       {success && <p className="mb-3 text-sm text-primary">{success}</p>}
+      {q.error && (
+        <p className="mb-3 text-sm text-destructive">
+          Could not load readings: {q.error instanceof Error ? q.error.message : "please try again."}
+        </p>
+      )}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
@@ -226,8 +310,9 @@ export default function UsagePage() {
                 ? Number(raw) * tariff
                 : 0;
               const hasPayment = !!inv && Number(inv.amountPaidKes) > 0;
+              const warning = inv || raw.trim() === "" ? null : readingWarning(Number(raw), c.previous?.units ?? null);
               return (
-                <tr key={c.client.id} className="border-t">
+                <tr key={c.client.id} className="border-t align-top">
                   <td className="px-3 py-2"><Code>{c.client.accountNumber}</Code></td>
                   <td className="px-3 py-2">{c.client.fullName}</td>
                   <td className="px-3 py-2 text-right">
@@ -238,9 +323,24 @@ export default function UsagePage() {
                       max={10000}
                       value={raw}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUnitsChange(c.client.id, e.target.value)}
-                      className="w-24 rounded-md border bg-background px-2 py-1 text-right text-sm"
+                      aria-label={`Units for ${c.client.fullName}`}
+                      className="h-11 w-24 rounded-md border bg-background px-2 text-right text-sm"
                       disabled={!!inv && editing !== inv.id}
                     />
+                    <p className="mt-1 max-w-[15rem] text-right text-[11px] leading-snug text-muted-foreground">
+                      {c.previous ? (
+                        <>
+                          Previous{" "}
+                          <span className="font-mono text-foreground">{formatUnits(c.previous.units)}</span> units
+                          <span className="hidden sm:inline">
+                            {c.previous.lastUpdatedAt ? ` · ${formatDate(c.previous.lastUpdatedAt)}` : ""}
+                          </span>
+                        </>
+                      ) : (
+                        "No previous reading"
+                      )}
+                    </p>
+                    {warning && <p className="mt-0.5 text-right text-[11px] font-medium text-warning">{warning}</p>}
                   </td>
                   <td className="px-3 py-2 text-right font-mono">{formatKES(preview)}</td>
                   <td className="px-3 py-2">

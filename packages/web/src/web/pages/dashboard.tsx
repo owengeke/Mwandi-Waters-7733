@@ -6,7 +6,7 @@ import { Code } from "../components/code";
 import { BalanceCard, OpenInvoicesCard } from "../components/client/billing-summary";
 import { BillsCard } from "../components/client/bills-card";
 import { PaymentsCard } from "../components/client/payments-card";
-import { UsageCard } from "../components/client/usage-card";
+import { UsageHistoryCard } from "../components/client/usage-history-card";
 import { AccountDetailsCard } from "../components/client/account-details-card";
 import { PaymentDialog } from "../components/client/payment-dialog";
 import { DemoBadge, Section } from "../components/client/section";
@@ -155,8 +155,12 @@ export const Dashboard = function Dashboard() {
               />
             </Section>
 
-            <Section id="usage" title="Usage" description="See how much water your household used each month.">
-              <UsageCard invoices={invoices} loading={overview.isLoading} />
+            <Section
+              id="usage"
+              title="Usage history"
+              description="Your meter is read every 15 days. Compare recent readings and see what each one cost."
+            >
+              <UsageHistoryCard />
             </Section>
 
             <Section id="account" title="Account" description="Your service details and the easiest way to pay.">

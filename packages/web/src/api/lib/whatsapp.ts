@@ -21,6 +21,17 @@ const GRAPH_URL = "https://graph.facebook.com";
 export const whatsappConfigured = () =>
   Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN);
 
+/**
+ * Invoice notices need their own approved template: WhatsApp only allows
+ * business-initiated messages through a template. Set
+ * `WHATSAPP_INVOICE_TEMPLATE` (e.g. mwandi_invoice) with six body variables:
+ * {{1}} name, {{2}} invoice number, {{3}} period, {{4}} units, {{5}} amount,
+ * {{6}} previous reading sentence.
+ */
+export const whatsappInvoiceConfigured = () =>
+  whatsappConfigured() && Boolean(process.env.WHATSAPP_INVOICE_TEMPLATE);
+
+
 /** +254 719 709 885 → 254719709885 (Cloud API wants digits only). */
 export const toWhatsAppId = (phone: string) => phone.replace(/\D/g, "");
 
@@ -57,5 +68,43 @@ export async function sendWhatsAppOtp(to: string, code: string): Promise<void> {
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new Error(`WhatsApp send failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
+}
+
+/** Sends the invoice template. Body variables are passed in template order. */
+export async function sendWhatsAppInvoice(to: string, variables: string[]): Promise<void> {
+  const version = process.env.WHATSAPP_API_VERSION ?? "v23.0";
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+  const template = process.env.WHATSAPP_INVOICE_TEMPLATE!;
+  const language = process.env.WHATSAPP_INVOICE_TEMPLATE_LANG ?? "en";
+
+  const res = await fetch(`${GRAPH_URL}/${version}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN!}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: toWhatsAppId(to),
+      type: "template",
+      template: {
+        name: template,
+        language: { code: language },
+        components: [
+          {
+            type: "body",
+            parameters: variables.map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    }),
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`WhatsApp invoice send failed (${res.status}): ${detail.slice(0, 300)}`);
   }
 }

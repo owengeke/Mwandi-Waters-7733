@@ -1,8 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "../lib/api";
+import type { UsageHalf } from "../../api/lib/usage-period";
 
-export function useUsage(month: string) {
-  return useQuery(orpc.usage.list.queryOptions({ input: { month } }));
+export function useUsage(month: string, half: UsageHalf) {
+  return useQuery(orpc.usage.list.queryOptions({ input: { month, half } }));
+}
+
+export function useUsageHistory() {
+  return useQuery(orpc.usage.history.queryOptions({ input: {} }));
 }
 
 function useInvalidate() {
@@ -11,6 +16,7 @@ function useInvalidate() {
     qc.invalidateQueries({ queryKey: orpc.usage.key() });
     qc.invalidateQueries({ queryKey: orpc.invoices.key() });
     qc.invalidateQueries({ queryKey: orpc.dashboard.key() });
+    qc.invalidateQueries({ queryKey: orpc.account.key() });
   };
 }
 
