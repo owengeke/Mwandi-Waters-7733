@@ -7,6 +7,7 @@ import { account } from "./routes/account";
 import { dashboard } from "./routes/dashboard";
 import { installations } from "./routes/installations";
 import { clients } from "./routes/clients";
+import { onboarding } from "./routes/onboarding";
 import { invoices } from "./routes/invoices";
 import { payments } from "./routes/payments";
 import { usage } from "./routes/usage";
@@ -23,6 +24,7 @@ export const router = {
   dashboard,
   installations,
   clients,
+  onboarding,
   invoices,
   payments,
   usage,

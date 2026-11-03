@@ -1,5 +1,5 @@
 import { cn } from "../lib/utils";
-import { Loader2 } from "lucide-react";
+import { SkeletonTableRows } from "./skeleton";
 
 export interface Column<T> {
   key: string;
@@ -41,12 +41,7 @@ export function DataTable<T>({ columns, rows, loading, error, rowKey, empty = "N
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-14 text-center text-muted-foreground">
-                  <Loader2 className="mx-auto size-5 animate-spin text-primary" />
-                  <span className="mt-2 block text-xs">Loading…</span>
-                </td>
-              </tr>
+              <SkeletonTableRows rows={5} columns={columns.length} />
             ) : error ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-14 text-center text-sm text-destructive">

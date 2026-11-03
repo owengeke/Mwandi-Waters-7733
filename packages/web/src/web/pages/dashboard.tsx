@@ -9,7 +9,7 @@ import { PaymentsCard } from "../components/client/payments-card";
 import { MeterReadingsCard } from "../components/client/meter-readings-card";
 import { AccountDetailsCard } from "../components/client/account-details-card";
 import { PaymentDialog } from "../components/client/payment-dialog";
-import { DemoBadge, Section } from "../components/client/section";
+import { DemoBadge, Section, Skeleton } from "../components/client/section";
 import { useAccountOverview, outstandingKes } from "../queries/account";
 import { useMe } from "../queries/portal";
 import { formatKES, formatUnits } from "../lib/format";
@@ -65,7 +65,7 @@ export const Dashboard = function Dashboard() {
                 <span>{formatUnits(invoices[0]?.consumptionUnits ?? 0)} units on your latest bill</span>
               </p>
             ) : (
-              <div className="mt-3 h-4 w-64 animate-pulse rounded bg-muted" />
+              <Skeleton className="mt-3 h-4 w-64" />
             )}
           </div>
 

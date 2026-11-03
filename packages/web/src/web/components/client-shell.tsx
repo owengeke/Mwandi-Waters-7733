@@ -82,10 +82,10 @@ function NavLinks({ active, onNavigate }: { active: SectionID; onNavigate?: () =
             }}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              "nav-slide group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
               isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "text-sidebar-accent-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {isActive && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-primary" />}
@@ -256,7 +256,9 @@ export function ClientShell({
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 md:px-8 md:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 md:px-8 md:py-10">
+        <div className="page-enter">{children}</div>
+      </main>
     </div>
   );
 }

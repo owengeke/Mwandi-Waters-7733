@@ -1,23 +1,43 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "../lib/utils";
 
 /** Accessible modal built on native <dialog> (focus trap + Esc for free). */
-export function Modal({ open, onClose, title, description, children, className }: {
+export function Modal({ open, onClose, onAfterClose, title, description, children, className }: {
   open: boolean;
   onClose: () => void;
+  /** Runs once the close animation has finished and the contents unmounted. */
+  onAfterClose?: () => void;
   title: string;
   description?: string;
   children: React.ReactNode;
   className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Keep the contents mounted briefly so the close animation has something to show.
+  const [rendered, setRendered] = useState(open);
+  const afterClose = useRef(onAfterClose);
+  useEffect(() => {
+    afterClose.current = onAfterClose;
+  });
 
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) d.showModal();
     if (!open && d.open) d.close();
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setRendered(false);
+      afterClose.current?.();
+    }, 220);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   return (
@@ -28,11 +48,11 @@ export function Modal({ open, onClose, title, description, children, className }
       aria-labelledby="modal-title"
       className={cn(
         "m-auto max-h-[calc(100dvh-2rem)] w-[min(560px,calc(100vw-2rem))] overflow-y-auto rounded-2xl border bg-card p-0 text-card-foreground shadow-2xl",
-        "backdrop:bg-[#0B132B]/55 backdrop:backdrop-blur-sm open:animate-in open:fade-in-0 open:zoom-in-95",
+        "backdrop:bg-[#0B132B]/55 backdrop:backdrop-blur-sm",
         className,
       )}
     >
-      {open && (
+      {rendered && (
         <div className="p-6 sm:p-8">
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>

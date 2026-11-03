@@ -6,10 +6,11 @@
 import { call } from "@orpc/server";
 import { router } from "../index";
 import { db } from "./index";
-import { payments, invoices, clients, installationRequests, meterReadings, user, session, account, verification } from "./schema";
+import { payments, invoices, clients, installationRequests, meterReadings, onboardingTokens, auditLog, user, session, account, verification } from "./schema";
 import { eq } from "drizzle-orm";
 import { auth } from "../auth";
 import { addDaysISO, roundReading } from "../lib/meter-readings";
+import { createOnboardingToken } from "../lib/onboarding";
 
 export const DEMO_PASSWORD = "Mwandi@2026";
 
@@ -55,6 +56,8 @@ async function main() {
   await db.delete(verification);
   await db.delete(user);
   await db.delete(meterReadings);
+  await db.delete(onboardingTokens);
+  await db.delete(auditLog);
   await db.delete(payments);
   await db.delete(installationRequests);
   await db.delete(invoices);
@@ -78,11 +81,53 @@ async function main() {
     reqs.push(await run(router.installations.create, { fullName, phoneNumber, physicalAddress }));
   }
 
-  // Four go all the way to installation → clients
+  // Four go all the way through onboarding to installation → clients.
+  // The public steps are written directly so the seed does not depend on a
+  // configured WhatsApp/SMS provider for the one-time link.
+  const profiles = [
+    { email: "wanjiru@example.co.ke", propertyType: "residential", occupantType: "owner", estate: "Kahawa Sukari", plotOrHouseNo: "14", landmark: "Kahawa Sukari shopping centre" },
+    { email: null, propertyType: "commercial", occupantType: "tenant", estate: "Milimani", plotOrHouseNo: "B-12", landmark: "Milimani market", landlordPhone: "0733000111" },
+    { email: null, propertyType: "commercial", occupantType: "owner", estate: "Nyali", plotOrHouseNo: "5", landmark: "Nyali Bridge" },
+    { email: null, propertyType: "residential", occupantType: "owner", estate: "Elgon View", plotOrHouseNo: "88", landmark: "Elgon View Primary" },
+  ] as const;
+
   const installed: any[] = [];
-  for (const r of reqs.slice(0, 4)) {
+  for (const [index, r] of reqs.slice(0, 4).entries()) {
     await run(router.installations.approve, { id: r.id, installationFeeKes: 12500 });
     await run(router.installations.markPaid, { id: r.id });
+
+    const profile = profiles[index];
+    const { token, tokenHash, expiresAt } = createOnboardingToken();
+    await db.insert(onboardingTokens).values({ applicationId: r.id, tokenHash, expiresAt });
+
+    await run(router.onboarding.saveStep, {
+      token,
+      step: 1,
+      data: { fullName: r.fullName, email: profile.email ?? undefined },
+    });
+    await run(router.onboarding.saveStep, {
+      token,
+      step: 2,
+      data: {
+        propertyType: profile.propertyType,
+        occupantType: profile.occupantType,
+        estate: profile.estate,
+        plotOrHouseNo: profile.plotOrHouseNo,
+        landmark: profile.landmark,
+        landlordPhone: "landlordPhone" in profile ? profile.landlordPhone : undefined,
+      },
+    });
+    await run(router.onboarding.saveStep, {
+      token,
+      step: 3,
+      data: { whatsappConsent: true, billingUseConsent: true },
+    });
+    await run(router.onboarding.saveStep, {
+      token,
+      step: 4,
+      data: { password: DEMO_PASSWORD },
+    });
+
     installed.push(((await run(router.installations.markInstalled, { id: r.id })) as any).client);
   }
   await run(router.installations.approve, { id: reqs[4].id, installationFeeKes: 15000 });
@@ -150,7 +195,8 @@ async function main() {
 
   await createLogin({ name: "David Njoroge", email: "admin@mwandiwaters.co.ke", role: "admin", phoneNumber: "+254700000002" });
   await createLogin({ name: "Faith Achieng", email: "staff@mwandiwaters.co.ke", role: "staff", phoneNumber: "+254700000003" });
-  await createLogin({ name: installed[0].fullName, email: "wanjiru@example.co.ke", role: "client", phoneNumber: installed[0].phoneNumber, clientId: installed[0].id });
+  // The client login for Wanjiru was created by markInstalled using the hash
+  // saved in onboarding step 4, so no second user is created here.
 
   /**
    * Meter readings: a synthetic cumulative chain per client (opening 0) that

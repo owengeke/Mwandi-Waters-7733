@@ -83,6 +83,8 @@
   --sidebar-border: #dce6f0;
   --sidebar-ring: #0077b6;
   --contour: rgba(0, 119, 182, 0.06);
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-enter: 420ms;
 }
 
 .dark {
@@ -143,22 +145,318 @@
   input, select, textarea, button {
     @apply font-sans;
   }
+  /* Smooth focus ring on form controls. */
+  input, select, textarea {
+    transition:
+      box-shadow 200ms var(--ease-soft),
+      border-color 200ms var(--ease-soft),
+      background-color 200ms var(--ease-soft);
+  }
+  /* Gentle press/hover feedback on buttons (transform only, no layout shift). */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):hover,
+    [role="button"]:not([aria-disabled="true"]):hover {
+      transform: translateY(-1px);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):active,
+    [role="button"]:not([aria-disabled="true"]):active {
+      transform: scale(0.98);
+    }
+  }
+}
+
+/* Unlayered so per-button `transition-*` utilities don't drop the transform. */
+button, [role="button"] {
+  transition:
+    transform 180ms var(--ease-soft),
+    background-color 180ms var(--ease-soft),
+    border-color 180ms var(--ease-soft),
+    color 180ms var(--ease-soft),
+    box-shadow 180ms var(--ease-soft);
 }
 
 /* Smooth colour change when toggling theme (not on first paint). */
 .theme-transition,
 .theme-transition * {
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, fill 200ms ease !important;
+  transition:
+    background-color 200ms var(--ease-soft),
+    border-color 200ms var(--ease-soft),
+    color 200ms var(--ease-soft),
+    fill 200ms var(--ease-soft) !important;
 }
 
-@keyframes rise {
+/* ---------------------------------------------------------------------------
+   Motion
+   Transform + opacity only, so nothing shifts layout. Entrances play once per
+   mount; everything is switched off under prefers-reduced-motion: reduce.
+--------------------------------------------------------------------------- */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes grow-bar {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes draw-line {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes ripple {
+  0% { transform: scale(0.9); opacity: 0; }
+  30% { opacity: 0.6; }
+  100% { transform: scale(1.12); opacity: 0; }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.85); opacity: 0.45; }
+  70% { transform: scale(1.4); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@keyframes tick {
+  from { opacity: 0; transform: scale(0.55); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+@keyframes row-flash {
+  from { background-color: color-mix(in srgb, var(--primary) 16%, transparent); }
+  to { background-color: transparent; }
+}
+@keyframes check-pop {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes status-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes page-enter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
 .rise {
-  animation: rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: fade-up var(--dur-enter) var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.anim-up {
+  animation: fade-up 440ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.anim-right {
+  animation: slide-in-right 520ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.anim-fade {
+  animation: fade-in 420ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.page-enter {
+  animation: page-enter 320ms var(--ease-soft) both;
+}
+
+/* Chart bars grow up from the baseline. */
+.grow-bar {
+  transform-origin: bottom center;
+  animation: grow-bar 520ms var(--ease-soft) both;
   animation-delay: calc(var(--i, 0) * 45ms);
 }
+
+/* Tracker timeline: steps tick in and connectors draw down. */
+.tick {
+  animation: tick 340ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+.line-draw {
+  transform-origin: top center;
+  animation: draw-line 320ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 120ms);
+}
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  opacity: 0;
+  animation: pulse-ring 2.8s var(--ease-soft) infinite;
+  pointer-events: none;
+}
+
+/* Slowly expanding water-ripple rings behind the hero card. */
+.ripple {
+  animation: ripple 9s var(--ease-soft) infinite;
+}
+.ripple-2 { animation-delay: 3s; }
+.ripple-3 { animation-delay: 6s; }
+
+/* Fade a status badge in when its status changes. */
+.status-fade { animation: status-fade 200ms var(--ease-soft) both; }
+
+/* A freshly issued invoice row briefly tints, then fades back. */
+.row-flash { animation: row-flash 1400ms var(--ease-soft) both; }
+
+/* Payment success tick. */
+.check-pop { animation: check-pop 420ms var(--ease-soft) both; }
+
+/* Scroll reveal for landing sections. */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.reveal-in {
+  animation: fade-up 460ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+/* Children of a staggered revealed container rise one after another. */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.reveal-in.reveal-stagger > * {
+  animation: fade-up 420ms var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* Skeleton shimmer: a gradient sliding across via transform. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--foreground) 9%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s var(--ease-soft) infinite;
+}
+
+/* Chart tooltip on hover / keyboard focus. */
+.chart-tip {
+  position: absolute;
+  left: 50%;
+  z-index: 20;
+  transform: translate(-50%, 6px) scale(0.98);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 170ms var(--ease-soft), transform 170ms var(--ease-soft);
+  white-space: nowrap;
+}
+.chart-col:hover .chart-tip,
+.chart-col:focus-visible .chart-tip {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+/* Chart columns are focusable only to reveal their tooltip. */
+.chart-col:not(:disabled):hover,
+.chart-col:not(:disabled):active {
+  transform: none;
+}
+
+/* Sidebar nav: a soft background that slides in from the left. */
+.nav-slide {
+  position: relative;
+  isolation: isolate;
+}
+.nav-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: var(--muted);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 200ms var(--ease-soft), opacity 200ms var(--ease-soft);
+}
+.nav-slide:hover::before,
+.nav-slide[aria-current="page"]::before {
+  transform: scaleX(1);
+  opacity: 1;
+}
+.nav-slide[aria-current="page"]::before {
+  background-color: var(--sidebar-accent);
+}
+
+/* Dialogs: fade the overlay, scale the panel up from 0.97, reverse on close. */
+dialog {
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 200ms var(--ease-soft), transform 200ms var(--ease-soft);
+}
+dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+}
+dialog::backdrop {
+  opacity: 0;
+  transition: opacity 200ms var(--ease-soft);
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@supports (transition-behavior: allow-discrete) {
+  dialog {
+    transition:
+      opacity 200ms var(--ease-soft),
+      transform 200ms var(--ease-soft),
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+  dialog::backdrop {
+    transition:
+      opacity 200ms var(--ease-soft),
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+}
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rise { animation: none; }
+  .rise, .anim-up, .anim-right, .anim-fade, .page-enter,
+  .grow-bar, .tick, .line-draw, .status-fade, .row-flash,
+  .check-pop, .reveal-in {
+    animation: none !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  .reveal-stagger > * { opacity: 1; transform: none; }
+  .reveal-in.reveal-stagger > * { animation: none !important; }
+  .ripple { animation: none; }
+  .pulse-dot::after { animation: none; opacity: 0; }
+  .skeleton::after { animation: none; opacity: 0; }
+  .chart-tip { transition: none; }
+  dialog, dialog::backdrop { transition: none; }
 }

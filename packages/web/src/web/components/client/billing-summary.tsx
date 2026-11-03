@@ -3,7 +3,18 @@ import type { Client, Invoice } from "../../../api/database/schema";
 import { formatDate, formatKES } from "../../lib/format";
 import { outstandingKes } from "../../queries/account";
 import { cn } from "../../lib/utils";
+import { useCountUp } from "../../lib/motion";
 import { Skeleton } from "./section";
+
+/** The balance counts up the first time it loads, then snaps on later updates. */
+function BalanceAmount({ value }: { value: number }) {
+  const counted = useCountUp(value);
+  return (
+    <p className="mt-2 font-display text-4xl font-bold tracking-tight tabular-nums md:text-[2.75rem]">
+      {formatKES(Math.abs(counted))}
+    </p>
+  );
+}
 
 export function BalanceCard({
   client,
@@ -44,9 +55,7 @@ export function BalanceCard({
           {loading ? (
             <Skeleton className="mt-3 h-10 w-56" />
           ) : (
-            <p className="mt-2 font-display text-4xl font-bold tracking-tight tabular-nums md:text-[2.75rem]">
-              {formatKES(Math.abs(balance))}
-            </p>
+            <BalanceAmount value={balance} />
           )}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
             {loading ? (

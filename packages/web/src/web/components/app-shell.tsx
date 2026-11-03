@@ -67,10 +67,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+              "nav-slide group flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
               active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-foreground/80 hover:bg-muted hover:text-foreground",
+                ? "text-sidebar-accent-foreground"
+                : "text-foreground/80 hover:text-foreground",
             )}
           >
             <Icon className={cn("size-[18px] shrink-0", color)} aria-hidden />
@@ -129,6 +129,7 @@ function Account() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [location] = useLocation();
   return (
     <div className="min-h-dvh lg:pl-[264px]">
       {/* Desktop sidebar */}
@@ -195,7 +196,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-[1360px] px-5 py-7 md:px-8 md:py-9">{children}</main>
+      <main className="mx-auto w-full max-w-[1360px] px-5 py-7 md:px-8 md:py-9">
+        <div key={location} className="page-enter">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

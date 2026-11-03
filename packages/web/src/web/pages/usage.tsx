@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Modal } from "../components/modal";
 import { Code } from "../components/code";
 import { StatusBadge } from "../components/status-badge";
+import { SkeletonTableRows } from "../components/skeleton";
 import { Field, Input } from "../components/form";
 import {
   useCorrectUsage,
@@ -586,11 +587,7 @@ export default function UsagePage() {
             </tr>
           </thead>
           <tbody>
-            {q.isLoading && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Loading...</td>
-              </tr>
-            )}
+            {q.isLoading && <SkeletonTableRows rows={5} columns={7} />}
             {!q.isLoading && (data?.clients as UsageRow[] | undefined)?.map((row) => {
               const raw = drafts[row.client.id] ?? "";
               const preview = computePreview(row, raw, tariff);

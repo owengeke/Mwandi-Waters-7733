@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { withUser } from "../middleware/auth";
 import { db } from "../database";
-import { installationRequests } from "../database/schema";
+import { clients, installationRequests } from "../database/schema";
 import { kenyanPhone } from "../lib/validators";
 import { createInstallationRequest } from "../lib/installations";
 import { publicTrackingView } from "../lib/privacy";
@@ -24,14 +24,26 @@ export const portal = {
       }),
     )
     .handler(async ({ input }) => {
+      // A water account already exists for this phone: one phone = one login,
+      // and multiple meters per person are out of scope for now. The public
+      // response never reveals the account or application details.
+      const [existingClient] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(and(eq(clients.phoneNumber, input.phoneNumber), ne(clients.status, "DRAFT")));
+      if (existingClient) {
+        throw new ORPCError("CONFLICT", {
+          message: "This phone number already has a water account. Sign in or contact us for help.",
+        });
+      }
+
       const [existing] = await db
-        .select({ ref: installationRequests.referenceNumber })
+        .select({ id: installationRequests.id })
         .from(installationRequests)
         .where(and(eq(installationRequests.phoneNumber, input.phoneNumber), inArray(installationRequests.status, [...OPEN])));
       if (existing) {
         throw new ORPCError("CONFLICT", {
-          message: `You already have an open application (${existing.ref}). Use Track Application to follow it.`,
-          data: { referenceNumber: existing.ref },
+          message: "An application with this phone number is already open. Use Track application to follow it.",
         });
       }
       const row = await createInstallationRequest(input);

@@ -185,7 +185,7 @@ export function PaymentDialog({
     >
       {step === "success" && result ? (
         <div className="text-center">
-          <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success/10 text-success">
+          <span className="check-pop mx-auto flex size-14 items-center justify-center rounded-full bg-success/10 text-success">
             <CheckCircle2 className="size-7" />
           </span>
           <p className="mt-4 font-display text-3xl font-bold tracking-tight tabular-nums">{formatKES(result.amountKes)}</p>
@@ -228,8 +228,9 @@ export function PaymentDialog({
         </div>
       ) : step === "waiting" ? (
         <div className="py-4 text-center">
-          <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Loader2 className="size-7 animate-spin" />
+          <span className="relative mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="absolute inset-0 rounded-full bg-primary/15 motion-safe:animate-ping" aria-hidden />
+            <Loader2 className="relative size-7 animate-spin" />
           </span>
           <h3 className="mt-4 text-base font-bold">Check your phone</h3>
           <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">

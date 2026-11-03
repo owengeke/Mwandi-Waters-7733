@@ -8,7 +8,7 @@ export const dashboard = {
     const [clientStats, invoiceStats, paymentStats, pendingRequests] = await Promise.all([
       db
         .select({
-          total: sql<number>`count(*)`,
+          total: sql<number>`sum(case when ${clients.status} = 'DRAFT' then 0 else 1 end)`,
           active: sql<number>`sum(case when ${clients.status} = 'ACTIVE' then 1 else 0 end)`,
           outstandingKes: sql<number>`coalesce(round(sum(case when ${clients.currentBalanceKes} > 0 then ${clients.currentBalanceKes} else 0 end), 2), 0)`,
         })

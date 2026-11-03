@@ -56,7 +56,7 @@ function MeterChart({ chart }: { chart: MeterChartPoint[] }) {
     <figure className="m-0 mt-6">
       <div className="overflow-x-auto pb-1" aria-hidden="true">
         <div className="flex min-w-max items-end gap-2 sm:gap-3">
-          {rows.map((point) => {
+          {rows.map((point, i) => {
             const height = Math.max(6, (point.units / max) * 100);
             const start = asDate(point.readingDate);
             return (
@@ -72,10 +72,10 @@ function MeterChart({ chart }: { chart: MeterChartPoint[] }) {
                 <div className="flex h-32 w-full items-end justify-center border-b border-dashed border-border/80">
                   <div
                     className={cn(
-                      "w-full rounded-t-md transition-colors",
+                      "grow-bar w-full rounded-t-md transition-colors",
                       point.isLatest ? "bg-primary" : "bg-primary/25 hover:bg-primary/40",
                     )}
-                    style={{ height: `${height}%` }}
+                    style={{ height: `${height}%`, "--i": i } as React.CSSProperties}
                   />
                 </div>
                 <span className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -184,7 +184,7 @@ export function MeterReadingsCard() {
           <Skeleton className="h-24 w-full" />
           <div className="flex h-40 items-end gap-3">
             {[62, 80, 54, 92, 70, 44].map((height, i) => (
-              <div key={i} className="flex-1 animate-pulse rounded-t-md bg-muted" style={{ height: `${height}%` }} />
+              <div key={i} className="skeleton flex-1 rounded-t-md" style={{ height: `${height}%` }} />
             ))}
           </div>
         </div>

@@ -34,5 +34,8 @@
 	},
 	"include": [
 		"src/web"
+	],
+	"exclude": [
+		"src/web/**/*.test.ts"
 	]
 }

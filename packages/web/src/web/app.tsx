@@ -2,11 +2,14 @@ import { Link, Route, Switch } from "wouter";
 import Index from "./pages/index";
 import InstallationsPage from "./pages/installations";
 import ClientsPage from "./pages/clients";
+import ClientNewPage from "./pages/client-new";
+import ClientDetailPage from "./pages/client-detail";
 import InvoicesPage from "./pages/invoices";
 import PaymentsPage from "./pages/payments";
 import UsagePage from "./pages/usage";
 import Landing from "./pages/landing";
 import Login from "./pages/login";
+import CompletePage from "./pages/complete";
 import ClientDashboard from "./pages/dashboard";
 import { Provider } from "./components/provider";
 import { AppShell } from "./components/app-shell";
@@ -32,6 +35,8 @@ function Console() {
       <Switch>
         <Route path="/" component={Index} />
         <Route path="/installations" component={InstallationsPage} />
+        <Route path="/clients/new" component={ClientNewPage} />
+        <Route path="/clients/:id" component={ClientDetailPage} />
         <Route path="/clients" component={ClientsPage} />
         <Route path="/invoices" component={InvoicesPage} />
         <Route path="/payments" component={PaymentsPage} />
@@ -48,6 +53,7 @@ function App() {
       <Switch>
         <Route path="/" component={Landing} />
         <Route path="/login" component={Login} />
+        <Route path="/complete/:token" component={CompletePage} />
         <Route path="/admin" nest>
           <RequireRole roles={["super_admin", "admin"]}>
             <Console />

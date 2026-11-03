@@ -4,14 +4,20 @@ import { cn } from "../lib/utils";
 
 export function Field({ label, htmlFor, hint, error, children }: {
   label: string;
-  htmlFor: string;
+  /** Omit for grouped controls (a fieldset), where a `<label for>` would dangle. */
+  htmlFor?: string;
   hint?: React.ReactNode;
   error?: string | null;
   children: React.ReactNode;
 }) {
+  const labelClass = "block text-sm font-semibold text-foreground";
   return (
     <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="block text-sm font-semibold text-foreground">{label}</label>
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelClass}>{label}</label>
+      ) : (
+        <span className={labelClass}>{label}</span>
+      )}
       {children}
       {error ? (
         <p className="text-xs font-medium text-destructive">{error}</p>
@@ -47,7 +53,7 @@ export function PrimaryButton({ loading, children, className, ...props }: React.
       disabled={loading || props.disabled}
       className={cn(
         "inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground",
-        "transition-[background,transform] hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60",
+        "transition-[background,transform] hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25",
         className,
       )}

@@ -37,6 +37,35 @@ export function unitsBetween(previous: number, current: number): number {
   return fromHundredths(toHundredths(current) - toHundredths(previous));
 }
 
+// ---------- Opening readings ----------
+export interface OpeningReadingInput {
+  clientId: number;
+  /** The number shown on the newly fitted meter. */
+  reading: number;
+  readingDate: string;
+  recordedBy?: string | null;
+  meterNumber?: string | null;
+}
+
+/**
+ * The one row that starts a meter chain. It always has `units_consumed = 0`
+ * and no invoice, so installing a meter never creates a charge.
+ */
+export function openingReadingRow(input: OpeningReadingInput) {
+  const value = roundReading(input.reading);
+  return {
+    clientId: input.clientId,
+    readingValue: value,
+    previousReading: value,
+    unitsConsumed: 0,
+    readingDate: input.readingDate,
+    recordedBy: input.recordedBy ?? null,
+    invoiceId: null,
+    isOpening: true,
+    meterNumber: input.meterNumber ?? null,
+  };
+}
+
 // ---------- Ordering and lookups ----------
 const compareAscending = (a: MeterReadingLike, b: MeterReadingLike) => {
   if (a.readingDate !== b.readingDate) return a.readingDate < b.readingDate ? -1 : 1;

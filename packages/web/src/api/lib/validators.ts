@@ -1,12 +1,20 @@
 import { z } from "zod";
+import { normalizePhone } from "./phone";
 
 /** Accepts 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, +2547XXXXXXXX → normalises to +254XXXXXXXXX. */
 export const kenyanPhone = z
   .string()
   .trim()
-  .transform((v) => v.replace(/[\s-]/g, ""))
-  .refine((v) => /^(?:\+?254|0)[17]\d{8}$/.test(v), "Enter a valid Kenyan phone number")
-  .transform((v) => "+254" + v.replace(/^(?:\+?254|0)/, ""));
+  .refine((v) => normalizePhone(v) !== null, "Enter a valid Kenyan phone number")
+  .transform((v) => normalizePhone(v) as string);
+
+/** Optional email: omitted or an empty string both mean "not provided". */
+export const optionalEmail = z
+  .preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().toLowerCase().email("Enter a valid email address").max(160).optional(),
+  )
+  .optional();
 
 export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 

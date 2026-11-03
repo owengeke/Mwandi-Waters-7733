@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Check, CircleX, Search } from "lucide-react";
 import { BrandMark } from "../components/app-shell";
 import { ThemeToggle } from "../components/theme-switcher";
 import { Modal } from "../components/modal";
+import { Reveal } from "../components/reveal";
 import { Field, FormError, Input, PrimaryButton } from "../components/form";
 import { StatusBadge } from "../components/status-badge";
 import { useApplyConnection, useMe, useTrackApplication } from "../queries/portal";
@@ -18,8 +19,24 @@ function errorMessage(e: unknown) {
 
 function Navbar({ onTrack }: { onTrack: () => void }) {
   const me = useMe();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur-md">
+    <header
+      className={cn(
+        "sticky top-0 z-30 border-b transition-colors duration-200",
+        scrolled
+          ? "border-border/60 bg-background/85 backdrop-blur-md"
+          : "border-transparent bg-background",
+      )}
+    >
       <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-2 px-5 md:px-8 sm:gap-4">
         <Link to="/" className="flex shrink-0 items-center gap-2.5">
           <BrandMark className="size-8" />
@@ -69,20 +86,23 @@ function ApplyModal({ open, onClose, onTrack }: { open: boolean; onClose: () => 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const close = () => {
-    onClose();
-    if (apply.isSuccess) {
-      apply.reset();
-      setForm({ fullName: "", phoneNumber: "", physicalAddress: "" });
-    }
-  };
+  const close = () => onClose();
 
   const ref = apply.data?.referenceNumber;
+
+  // Reset only once the close animation has finished, so the dialog doesn't
+  // flash an empty form on its way out.
+  const resetForm = () => {
+    if (!apply.isSuccess) return;
+    apply.reset();
+    setForm({ fullName: "", phoneNumber: "", physicalAddress: "" });
+  };
 
   return (
     <Modal
       open={open}
       onClose={close}
+      onAfterClose={resetForm}
       title={ref ? "Application received" : "Apply for a new connection"}
       description={ref ? undefined : "Tell us who you are and where the meter should go. A surveyor will review it within 3 working days."}
     >
@@ -171,13 +191,21 @@ function Timeline({ result }: { result: TrackResult }) {
         return (
           <li key={s.status} className="relative flex gap-3.5 pb-5 last:pb-0">
             {i < STEPS.length - 1 && (
-              <span className={cn("absolute left-[11px] top-7 h-[calc(100%-1.5rem)] w-0.5", done ? "bg-primary" : "bg-border")} aria-hidden />
+              <span
+                className={cn(
+                  "line-draw absolute left-[11px] top-7 h-[calc(100%-1.5rem)] w-0.5",
+                  done ? "bg-primary" : "bg-border",
+                )}
+                style={{ "--i": i } as React.CSSProperties}
+                aria-hidden
+              />
             )}
             <span
+              style={{ "--i": i } as React.CSSProperties}
               className={cn(
-                "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2",
+                "tick relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2",
                 done && "border-primary bg-primary text-primary-foreground",
-                active && "border-primary bg-card ring-4 ring-primary/15",
+                active && "pulse-dot border-primary bg-card ring-4 ring-primary/15",
                 !done && !active && "border-border bg-card",
               )}
             >
@@ -268,9 +296,9 @@ function HeroPanel() {
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[min(130%,640px)] -translate-x-1/2 -translate-y-1/2"
       >
-        <div className="absolute inset-[6%] rounded-full border border-primary/12" />
-        <div className="absolute inset-[19%] rounded-full border border-primary/12" />
-        <div className="absolute inset-[32%] rounded-full border border-primary/12" />
+        <div className="ripple absolute inset-[6%] rounded-full border border-primary/12" />
+        <div className="ripple ripple-2 absolute inset-[19%] rounded-full border border-primary/12" />
+        <div className="ripple ripple-3 absolute inset-[32%] rounded-full border border-primary/12" />
       </div>
 
       <figure className="relative">
@@ -290,17 +318,19 @@ function HeroPanel() {
                 {i < HERO_STEPS.length - 1 && (
                   <span
                     className={cn(
-                      "absolute left-[10px] top-6 h-[calc(100%-1.25rem)] w-0.5",
+                      "line-draw absolute left-[10px] top-6 h-[calc(100%-1.25rem)] w-0.5",
                       i < 2 ? "bg-primary" : "bg-border",
                     )}
+                    style={{ "--i": i } as React.CSSProperties}
                     aria-hidden
                   />
                 )}
                 <span
+                  style={{ "--i": i } as React.CSSProperties}
                   className={cn(
-                    "relative z-10 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 bg-card",
+                    "tick relative z-10 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 bg-card",
                     step.done && "border-primary bg-primary text-primary-foreground",
-                    !step.done && step.current && "border-primary",
+                    !step.done && step.current && "pulse-dot border-primary",
                     !step.done && !step.current && "border-border",
                   )}
                 >
@@ -376,14 +406,20 @@ export const Landing = function Landing() {
       <main>
         <section className="relative overflow-hidden">
           <div className="relative mx-auto grid max-w-[1280px] items-center gap-12 px-5 pb-14 pt-12 md:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-20 lg:pt-16">
-            <div className="rise">
-              <h1 className="font-display text-[2.2rem] font-bold leading-[1.04] tracking-tight text-foreground sm:text-[2.8rem] lg:text-[3.5rem]">
+            <div>
+              <h1 className="anim-up font-display text-[2.2rem] font-bold leading-[1.04] tracking-tight text-foreground sm:text-[2.8rem] lg:text-[3.5rem]">
                 Water Connection Services <span className="text-primary">Made Simple</span>
               </h1>
-              <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+              <p
+                className="anim-up mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground"
+                style={{ "--i": 1 } as React.CSSProperties}
+              >
                 Apply for a new connection, follow every step from survey to meter installation, and manage your bills from your phone.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div
+                className="anim-up mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+                style={{ "--i": 2 } as React.CSSProperties}
+              >
                 <button
                   type="button"
                   onClick={() => setApplyOpen(true)}
@@ -399,47 +435,58 @@ export const Landing = function Landing() {
                   Track Application
                 </button>
               </div>
-              <p className="mt-6 text-sm text-muted-foreground">
+              <p
+                className="anim-up mt-6 text-sm text-muted-foreground"
+                style={{ "--i": 3 } as React.CSSProperties}
+              >
                 Already a customer?{" "}
                 <Link to="/login" className="font-semibold text-primary hover:underline">
                   Sign in with your phone or account number
                 </Link>
               </p>
             </div>
-            <div className="rise" style={{ "--i": 2 } as React.CSSProperties}>
+            <div className="anim-right" style={{ "--i": 1 } as React.CSSProperties}>
               <HeroPanel />
             </div>
           </div>
         </section>
 
         <section id="pay-your-bill" className="mx-auto max-w-[1280px] scroll-mt-24 px-5 md:px-8">
-          <div className="grid divide-y rounded-xl border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-            {FACTS.map((fact) => (
-              <div key={fact.title} className="p-6">
-                <h2 className="font-display text-[17px] font-bold text-foreground">{fact.title}</h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{fact.body}</p>
-              </div>
-            ))}
-          </div>
+          <Reveal>
+            <div className="grid divide-y rounded-xl border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              {FACTS.map((fact) => (
+                <div key={fact.title} className="p-6">
+                  <h2 className="font-display text-[17px] font-bold text-foreground">{fact.title}</h2>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{fact.body}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
         </section>
 
         <section id="how-it-works" className="mx-auto max-w-[1280px] scroll-mt-24 px-5 pt-16 md:px-8 md:pt-20">
-          <h2 className="font-display text-[1.75rem] font-bold tracking-tight text-foreground md:text-[2rem]">
-            How a new connection works
-          </h2>
-          <div className="mt-8 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          <Reveal>
+            <h2 className="font-display text-[1.75rem] font-bold tracking-tight text-foreground md:text-[2rem]">
+              How a new connection works
+            </h2>
+          </Reveal>
+          <Reveal stagger className="mt-8 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {HOW.map((step, i) => (
-              <div key={step.title} className="border-t-2 border-primary pt-4">
+              <div
+                key={step.title}
+                className="border-t-2 border-primary pt-4"
+                style={{ "--i": i } as React.CSSProperties}
+              >
                 <p className="text-sm font-semibold text-primary">{i + 1}</p>
                 <h3 className="mt-1 font-display text-[17px] font-bold text-foreground">{step.title}</h3>
                 <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{step.body}</p>
               </div>
             ))}
-          </div>
+          </Reveal>
         </section>
 
         <section className="mt-16 bg-[#0b1b2e] py-14 md:mt-20">
-          <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-5 md:flex-row md:items-center md:justify-between md:px-8">
+          <Reveal className="mx-auto flex max-w-[1280px] flex-col gap-6 px-5 md:flex-row md:items-center md:justify-between md:px-8">
             <div>
               <h2 className="font-display text-[1.75rem] font-bold tracking-tight text-white md:text-[2rem]">
                 Ready to get connected?
@@ -455,7 +502,7 @@ export const Landing = function Landing() {
             >
               Apply for New Connection
             </button>
-          </div>
+          </Reveal>
         </section>
       </main>
 

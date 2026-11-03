@@ -33,8 +33,29 @@ export const INSTALLATION_STATUSES = [
 ] as const;
 export type InstallationStatus = (typeof INSTALLATION_STATUSES)[number];
 
-export const CLIENT_STATUSES = ["ACTIVE", "SUSPENDED", "DISCONNECTED"] as const;
+export const CLIENT_STATUSES = ["ACTIVE", "SUSPENDED", "DISCONNECTED", "DRAFT"] as const;
 export type ClientStatus = (typeof CLIENT_STATUSES)[number];
+
+/** Property profile captured during onboarding (applications and clients). */
+export const PROPERTY_TYPES = ["residential", "commercial"] as const;
+export type PropertyType = (typeof PROPERTY_TYPES)[number];
+
+export const OCCUPANT_TYPES = ["owner", "tenant"] as const;
+export type OccupantType = (typeof OCCUPANT_TYPES)[number];
+
+/** How a client record entered the system. */
+export const CLIENT_CREATED_VIA = ["online", "walk_in", "import"] as const;
+export type ClientCreatedVia = (typeof CLIENT_CREATED_VIA)[number];
+
+/** Audited domain events. Keep in sync with the actions written by the API. */
+export const AUDIT_ACTIONS = [
+  "client.created",
+  "application.approved",
+  "details.completed",
+  "installed",
+  "client.edited",
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export const INVOICE_STATUSES = ["UNPAID", "PARTIALLY_PAID", "PAID", "OVERDUE"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
@@ -66,6 +87,22 @@ export const installationRequests = sqliteTable(
     status: text("status", { enum: INSTALLATION_STATUSES }).notNull().default("PENDING_REVIEW"),
     installationFeeKes: numeric("installation_fee_kes", { mode: "number" }).notNull().default(0),
     rejectionReason: text("rejection_reason"),
+    /**
+     * Onboarding profile. Added by the "Complete your details" flow after the
+     * application is approved and paid; all fields stay nullable so existing
+     * applications keep working.
+     */
+    email: text("email"),
+    propertyType: text("property_type", { enum: PROPERTY_TYPES }),
+    occupantType: text("occupant_type", { enum: OCCUPANT_TYPES }),
+    estate: text("estate"),
+    plotOrHouseNo: text("plot_or_house_no"),
+    landmark: text("landmark"),
+    landlordPhone: text("landlord_phone"),
+    whatsappConsentAt: integer("whatsapp_consent_at", { mode: "timestamp" }),
+    detailsCompletedAt: integer("details_completed_at", { mode: "timestamp" }),
+    /** Better Auth credential hash captured in step 4; never a plain password. */
+    passwordHash: text("password_hash"),
     clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
     ...timestamps,
   },
@@ -85,10 +122,19 @@ export const clients = sqliteTable(
     accountNumber: text("account_number").notNull().unique(), // ACC-XXXX
     fullName: text("full_name").notNull(),
     phoneNumber: text("phone_number").notNull(),
+    email: text("email"),
     meterNumber: text("meter_number").notNull().unique(), // MTR-XXXX
     /** Positive = client owes the utility; negative = credit on account. */
     currentBalanceKes: numeric("current_balance_kes", { mode: "number" }).notNull().default(0),
     status: text("status", { enum: CLIENT_STATUSES }).notNull().default("ACTIVE"),
+    /** Property profile copied from the application or entered on the admin form. */
+    propertyType: text("property_type", { enum: PROPERTY_TYPES }),
+    occupantType: text("occupant_type", { enum: OCCUPANT_TYPES }),
+    estate: text("estate"),
+    plotOrHouseNo: text("plot_or_house_no"),
+    landmark: text("landmark"),
+    landlordPhone: text("landlord_phone"),
+    createdVia: text("created_via", { enum: CLIENT_CREATED_VIA }),
     ...timestamps,
   },
   (t) => [
@@ -275,6 +321,62 @@ export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type MeterReading = typeof meterReadings.$inferSelect;
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
+
+// ---------- Onboarding tokens ----------
+/**
+ * One-time links sent over WhatsApp. Only the SHA-256 hash of the token is
+ * stored, so a leaked database never exposes a usable link.
+ *
+ * A token targets either an application (the public "Complete your details"
+ * flow) or a client (the set-password link sent after a walk-in account is
+ * created). Exactly one of applicationId / clientId is set.
+ */
+export const onboardingTokens = sqliteTable(
+  "onboarding_tokens",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    applicationId: integer("application_id").references(() => installationRequests.id, {
+      onDelete: "cascade",
+    }),
+    clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("onboarding_tokens_application_idx").on(t.applicationId),
+    index("onboarding_tokens_client_idx").on(t.clientId),
+  ],
+);
+
+// ---------- Audit log ----------
+/** Append-only record of sensitive onboarding/account events. */
+export const auditLog = sqliteTable(
+  "audit_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Null for public/self-service actions with no signed-in staff user. */
+    actorUserId: text("actor_user_id"),
+    action: text("action", { enum: AUDIT_ACTIONS }).notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("audit_log_entity_idx").on(t.entityType, t.entityId),
+    index("audit_log_action_idx").on(t.action),
+    index("audit_log_created_idx").on(t.createdAt),
+  ],
+);
+
+export type OnboardingToken = typeof onboardingTokens.$inferSelect;
+export type AuditLogEntry = typeof auditLog.$inferSelect;
 
 // Better Auth tables (user, session, account, verification) — generated, do not edit by hand.
 export * from "./auth-schema";

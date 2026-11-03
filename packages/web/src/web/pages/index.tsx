@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   Clock,
@@ -14,6 +14,8 @@ import { useInstallations, useMarkInstallationPaid } from "../queries/installati
 import { useInvoices } from "../queries/invoices";
 import { useMe } from "../queries/portal";
 import { formatDate, formatKES, formatUnits } from "../lib/format";
+import { useCountUp } from "../lib/motion";
+import { Skeleton, SkeletonTableRows } from "../components/skeleton";
 import { cn } from "../lib/utils";
 
 type InvoiceRow = NonNullable<ReturnType<typeof useInvoices>["data"]>[number];
@@ -127,6 +129,18 @@ const TONES = {
 
 type Tone = keyof typeof TONES;
 
+/** Money that counts up once, then keeps its KES formatting and two decimals. */
+function CountKes({ value }: { value: number | undefined }) {
+  const counted = useCountUp(value);
+  return <>{formatKES(value === undefined ? undefined : counted)}</>;
+}
+
+/** A whole number that counts up once. */
+function CountInt({ value }: { value: number | undefined }) {
+  const counted = useCountUp(value);
+  return <>{value === undefined ? 0 : Math.round(counted)}</>;
+}
+
 function KpiCard({
   label,
   value,
@@ -137,7 +151,7 @@ function KpiCard({
   loading,
 }: {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   caption: string;
   icon: React.ReactNode;
   tone: Tone;
@@ -157,7 +171,7 @@ function KpiCard({
         </span>
       </div>
       {loading ? (
-        <div className="mt-2 h-8 w-32 animate-pulse rounded-md bg-foreground/10" />
+        <Skeleton className="mt-2 h-8 w-32" />
       ) : (
         <p
           className={cn(
@@ -195,7 +209,7 @@ function ChartCard({ series }: { series: ReturnType<typeof buildSeries> }) {
   const ticks = [0, top / 3, (top / 3) * 2, top];
 
   return (
-    <section className="rise rounded-2xl border bg-card p-5 md:p-6" style={{ "--i": 4 } as React.CSSProperties}>
+    <section className="rise rounded-2xl border bg-card p-5 md:p-6" style={{ "--i": 5 } as React.CSSProperties}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionTitle dot="bg-[#38bdf8]">Billed vs collected</SectionTitle>
         <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
@@ -214,15 +228,8 @@ function ChartCard({ series }: { series: ReturnType<typeof buildSeries> }) {
         <p className="py-16 text-center text-sm text-muted-foreground">No invoices to chart yet.</p>
       ) : (
         <>
-          <p className="sr-only">
-            Billed versus collected by month.{" "}
-            {series
-              .map((point) => `${point.label}: billed ${formatKES(point.billed)}, collected ${formatKES(point.collected)}`)
-              .join(". ")}
-            .
-          </p>
-          <div className="mt-7 grid grid-cols-[auto_1fr] gap-x-3" aria-hidden>
-            <div className="relative h-[210px]">
+          <div className="mt-7 grid grid-cols-[auto_1fr] gap-x-3">
+            <div className="relative h-[210px]" aria-hidden>
               {ticks.map((tick) => (
                 <span
                   key={tick}
@@ -245,25 +252,35 @@ function ChartCard({ series }: { series: ReturnType<typeof buildSeries> }) {
                   ) : null,
                 )}
                 <div className="absolute inset-0 flex items-end justify-around gap-1 sm:gap-2">
-                  {series.map((point) => (
-                    <div key={point.key} className="flex h-full flex-1 items-end justify-center gap-1 sm:gap-1.5">
-                      <div
-                        className="w-full max-w-[30px] rounded-t-md"
+                  {series.map((point, i) => (
+                    <button
+                      key={point.key}
+                      type="button"
+                      aria-label={`${point.label}: billed ${formatKES(point.billed)}, collected ${formatKES(point.collected)}`}
+                      className="chart-col relative flex h-full flex-1 cursor-default items-end justify-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:gap-1.5"
+                    >
+                      <span
+                        className="grow-bar block w-full max-w-[30px] rounded-t-md"
                         style={{
                           height: `${(point.billed / top) * 100}%`,
                           minHeight: point.billed > 0 ? 2 : 0,
                           backgroundColor: BILLED_COLOR,
-                        }}
+                          "--i": i * 2,
+                        } as React.CSSProperties}
                       />
-                      <div
-                        className="w-full max-w-[30px] rounded-t-md"
+                      <span
+                        className="grow-bar block w-full max-w-[30px] rounded-t-md"
                         style={{
                           height: `${(point.collected / top) * 100}%`,
                           minHeight: point.collected > 0 ? 2 : 0,
                           backgroundColor: COLLECTED_COLOR,
-                        }}
+                          "--i": i * 2 + 1,
+                        } as React.CSSProperties}
                       />
-                    </div>
+                      <span aria-hidden="true" className="chart-tip bottom-full mb-1 rounded-lg border bg-popover px-2.5 py-1.5 text-[11px] font-medium text-popover-foreground shadow-md">
+                        {point.label}: {formatKES(point.billed)} billed · {formatKES(point.collected)} collected
+                      </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -296,7 +313,7 @@ function AttentionRow({
   onMarkPaid?: (id: number) => void;
 }) {
   const buttonClass =
-    "inline-flex h-11 items-center rounded-lg border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60 sm:h-10";
+    "inline-flex h-11 items-center gap-1.5 rounded-lg border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60 sm:h-10";
 
   if (overdue) {
     const { invoice, client } = overdue;
@@ -361,9 +378,17 @@ function AttentionRow({
               type="button"
               onClick={() => onMarkPaid?.(fee.id)}
               disabled={paying}
+              aria-busy={paying || undefined}
               className={buttonClass}
             >
-              {paying ? "Recording..." : "Record payment"}
+              {paying ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  Recording…
+                </>
+              ) : (
+                "Record payment"
+              )}
             </button>
           </div>
         </div>
@@ -384,6 +409,23 @@ export default function Dashboard() {
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => invoices.data ?? [], [invoices.data]);
+
+  // Briefly tint any invoice that appears after the first load (e.g. just issued).
+  const knownInvoiceIds = useRef<Set<number> | null>(null);
+  const [flashIds, setFlashIds] = useState<Set<number>>(() => new Set());
+  useEffect(() => {
+    const ids = rows.map(({ invoice }) => invoice.id);
+    if (knownInvoiceIds.current === null) {
+      knownInvoiceIds.current = new Set(ids);
+      return;
+    }
+    const fresh = ids.filter((id) => !knownInvoiceIds.current!.has(id));
+    if (fresh.length === 0) return;
+    fresh.forEach((id) => knownInvoiceIds.current!.add(id));
+    setFlashIds(new Set(fresh));
+    const timer = window.setTimeout(() => setFlashIds(new Set()), 1400);
+    return () => window.clearTimeout(timer);
+  }, [rows]);
   const series = useMemo(() => buildSeries(rows), [rows]);
   const overdue = useMemo(
     () =>
@@ -457,41 +499,41 @@ export default function Dashboard() {
 
       <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          index={0}
+          index={1}
           tone="blue"
           label="Outstanding balance"
           icon={<FileText className="size-[18px]" />}
           loading={summary.isLoading}
-          value={formatKES(s?.outstandingKes)}
+          value={<CountKes value={s?.outstandingKes} />}
           caption={`${openInvoices} open invoice${openInvoices === 1 ? "" : "s"}`}
         />
         <KpiCard
-          index={1}
+          index={2}
           tone="red"
           label="Overdue"
           icon={<Clock className="size-[18px]" />}
           loading={summary.isLoading}
-          value={formatKES(s?.overdue.amountKes)}
+          value={<CountKes value={s?.overdue.amountKes} />}
           caption={`${s?.overdue.count ?? 0} invoice${(s?.overdue.count ?? 0) === 1 ? "" : "s"}${
             oldestOverdue ? `, past due ${shortDate(oldestOverdue)}` : ""
           }`}
         />
         <KpiCard
-          index={2}
+          index={3}
           tone="violet"
           label="Active clients"
           icon={<Users className="size-[18px]" />}
           loading={summary.isLoading}
-          value={s?.clients.active ?? 0}
+          value={<CountInt value={s?.clients.active} />}
           caption="Billed at KES 150 per unit"
         />
         <KpiCard
-          index={3}
+          index={4}
           tone="orange"
           label="Connection requests"
           icon={<ClipboardList className="size-[18px]" />}
           loading={summary.isLoading}
-          value={s?.openInstallationRequests ?? 0}
+          value={<CountInt value={s?.openInstallationRequests} />}
           caption={feeRequests.length > 0 ? "Awaiting installation fee" : "Awaiting review or installation"}
         />
       </section>
@@ -499,7 +541,7 @@ export default function Dashboard() {
       <div className="mb-5 grid gap-5 xl:grid-cols-[1.75fr_1fr]">
         <ChartCard series={series} />
 
-        <section className="rise rounded-2xl border bg-card p-5 md:p-6" style={{ "--i": 5 } as React.CSSProperties}>
+        <section className="rise rounded-2xl border bg-card p-5 md:p-6" style={{ "--i": 6 } as React.CSSProperties}>
           <SectionTitle dot="bg-[#f97316]">Needs attention</SectionTitle>
           <div className="mt-5 space-y-3">
             {attention.length === 0 ? (
@@ -528,7 +570,7 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <section className="rise overflow-hidden rounded-2xl border bg-card" style={{ "--i": 6 } as React.CSSProperties}>
+      <section className="rise overflow-hidden rounded-2xl border bg-card" style={{ "--i": 7 } as React.CSSProperties}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 md:px-6">
           <SectionTitle dot="bg-[#7c3aed]">Recent invoices</SectionTitle>
           <Link
@@ -552,12 +594,7 @@ export default function Dashboard() {
             </thead>
             <tbody className="divide-y">
               {invoices.isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-14 text-center text-muted-foreground">
-                    <Loader2 className="mx-auto size-5 animate-spin text-primary" />
-                    <span className="mt-2 block text-xs">Loading invoices...</span>
-                  </td>
-                </tr>
+                <SkeletonTableRows rows={6} columns={6} />
               ) : invoices.error ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-14 text-center text-sm text-destructive">
@@ -572,7 +609,13 @@ export default function Dashboard() {
                 </tr>
               ) : (
                 recent.map(({ invoice, client }) => (
-                  <tr key={invoice.id} className="transition-colors hover:bg-muted/50">
+                  <tr
+                    key={invoice.id}
+                    className={cn(
+                      "transition-colors hover:bg-muted/50",
+                      flashIds.has(invoice.id) && "row-flash",
+                    )}
+                  >
                     <td className="whitespace-nowrap px-5 py-3.5 font-semibold text-foreground md:px-6">
                       {invoice.invoiceNumber}
                     </td>

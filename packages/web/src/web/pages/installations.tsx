@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BadgeCheck, Send } from "lucide-react";
 import { PageHeader } from "../components/page-header";
 import { DataTable, type Column } from "../components/data-table";
 import { FilterTabs, SearchInput } from "../components/filter-tabs";
@@ -7,6 +8,8 @@ import { StatusBadge } from "../components/status-badge";
 import { Modal } from "../components/modal";
 import { Field, FormError, Input, PrimaryButton } from "../components/form";
 import { Button } from "../components/ui/button";
+import { useToast } from "../components/toast";
+import { useSendOnboardingLink } from "../queries/onboarding";
 import {
   useApproveInstallation,
   useInstallations,
@@ -14,7 +17,7 @@ import {
   useMarkInstallationPaid,
   useRejectInstallation,
 } from "../queries/installations";
-import { formatDate, formatKES, formatPhone } from "../lib/format";
+import { formatDate, formatKES, formatPhone, humanize } from "../lib/format";
 import { INSTALLATION_STATUSES, type InstallationRequest, type InstallationStatus } from "../../api/database/schema";
 
 /** Default quote shown to the reviewer — the surveyor overrides it per site. */
@@ -61,11 +64,32 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
   const reject = useRejectInstallation();
   const markPaid = useMarkInstallationPaid();
   const markInstalled = useMarkInstalled();
+  const sendLink = useSendOnboardingLink();
+  const toast = useToast();
 
-  const busy = approve.isPending || reject.isPending || markPaid.isPending || markInstalled.isPending;
+  const detailsComplete = Boolean(request.detailsCompletedAt);
+  const busy =
+    approve.isPending || reject.isPending || markPaid.isPending || markInstalled.isPending || sendLink.isPending;
   const onError = (e: unknown) =>
     setError(e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
   const closeAfter = () => onClose();
+
+  async function sendDetailsLink() {
+    setError(null);
+    try {
+      const result = await sendLink.mutateAsync({ id: request.id });
+      toast({
+        title: result.sent ? "Details link sent" : "Link created",
+        description: result.devLink
+          ? result.devLink
+          : result.sent
+            ? "The client can now complete their details."
+            : "No WhatsApp/SMS provider is configured, so nothing was delivered.",
+      });
+    } catch (error) {
+      onError(error);
+    }
+  }
 
   function submitApprove() {
     setError(null);
@@ -151,6 +175,34 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
         <Detail label="Installation fee">
           {request.installationFeeKes ? formatKES(request.installationFeeKes) : "Not quoted"}
         </Detail>
+        <Detail label="Client details">
+          {detailsComplete ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-semibold text-success">
+              <BadgeCheck className="size-3.5" aria-hidden /> Complete
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-warning/12 px-2.5 py-0.5 text-xs font-semibold text-warning">
+              Not completed
+            </span>
+          )}
+        </Detail>
+        {request.propertyType && (
+          <Detail label="Property">
+            {humanize(request.propertyType)}
+            {request.occupantType ? ` · ${humanize(request.occupantType)}` : ""}
+          </Detail>
+        )}
+        {(request.estate || request.plotOrHouseNo) && (
+          <Detail label="Estate / plot">
+            {[request.estate, request.plotOrHouseNo].filter(Boolean).join(" · ")}
+          </Detail>
+        )}
+        {request.landmark && <Detail label="Nearest landmark">{request.landmark}</Detail>}
+        {request.landlordPhone && (
+          <Detail label="Landlord phone">
+            <Code className="text-muted-foreground">{formatPhone(request.landlordPhone)}</Code>
+          </Detail>
+        )}
       </dl>
 
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -272,35 +324,50 @@ function ReviewBody({ request, onClose }: { request: InstallationRequest; onClos
 
       {request.status === "PAID" && (
         <div className="space-y-4">
-          <Field
-            label="Meter number"
-            htmlFor="meter-number"
-            hint="Leave blank for an automatic MTR-XXXX number. Completing the installation creates the client account."
-          >
-            <Input
-              id="meter-number"
-              value={meter}
-              onChange={(e) => setMeter(e.target.value)}
-              placeholder="MTR-1042 (optional)"
-              disabled={busy}
-            />
-          </Field>
-          <Field
-            label="Opening meter reading"
-            htmlFor="opening-reading"
-            hint="The number on the meter at installation. Creates no charge; the first bill starts from here."
-          >
-            <Input
-              id="opening-reading"
-              inputMode="decimal"
-              value={openingReading}
-              onChange={(e) => setOpeningReading(e.target.value)}
-              disabled={busy}
-            />
-          </Field>
-          <PrimaryButton loading={markInstalled.isPending} disabled={busy} onClick={submitInstalled}>
-            Complete installation
-          </PrimaryButton>
+          {!detailsComplete ? (
+            <div className="space-y-3 rounded-xl border border-warning/35 bg-warning/10 p-4">
+              <p className="text-sm font-semibold text-warning">Waiting for the client&apos;s details</p>
+              <p className="text-sm text-muted-foreground">
+                The client must complete their details and set a password before the meter can be installed.
+              </p>
+              <Button type="button" variant="outline" disabled={busy} onClick={sendDetailsLink}>
+                <Send className="size-4" />
+                {sendLink.isPending ? "Sending…" : "Resend details link"}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Field
+                label="Meter number"
+                htmlFor="meter-number"
+                hint="Leave blank for an automatic MTR-XXXX number. Completing the installation creates the client account."
+              >
+                <Input
+                  id="meter-number"
+                  value={meter}
+                  onChange={(e) => setMeter(e.target.value)}
+                  placeholder="MTR-1042 (optional)"
+                  disabled={busy}
+                />
+              </Field>
+              <Field
+                label="Opening meter reading"
+                htmlFor="opening-reading"
+                hint="The number on the meter at installation. Creates no charge; the first bill starts from here."
+              >
+                <Input
+                  id="opening-reading"
+                  inputMode="decimal"
+                  value={openingReading}
+                  onChange={(e) => setOpeningReading(e.target.value)}
+                  disabled={busy}
+                />
+              </Field>
+              <PrimaryButton loading={markInstalled.isPending} disabled={busy} onClick={submitInstalled}>
+                Complete installation
+              </PrimaryButton>
+            </>
+          )}
         </div>
       )}
 
@@ -324,6 +391,18 @@ export default function InstallationsPage() {
     { key: "name", header: "Applicant", cell: (r) => <span className="font-medium">{r.fullName}</span> },
     { key: "phone", header: "Phone", cell: (r) => <Code className="text-muted-foreground">{formatPhone(r.phoneNumber)}</Code> },
     { key: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+    {
+      key: "details",
+      header: "Details",
+      cell: (r) =>
+        r.detailsCompletedAt ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-semibold text-success">
+            <BadgeCheck className="size-3.5" aria-hidden /> Complete
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Pending</span>
+        ),
+    },
     { key: "date", header: "Submitted", cell: (r) => <span className="text-muted-foreground">{formatDate(r.createdAt)}</span> },
     { key: "fee", header: "Fee", align: "right", cell: (r) => (r.installationFeeKes ? formatKES(r.installationFeeKes) : <span className="text-muted-foreground">Not quoted</span>) },
     {

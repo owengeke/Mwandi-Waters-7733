@@ -108,3 +108,67 @@ export async function sendWhatsAppInvoice(to: string, variables: string[]): Prom
     throw new Error(`WhatsApp invoice send failed (${res.status}): ${detail.slice(0, 300)}`);
   }
 }
+
+/**
+ * Sends a body-only template. Used for the one-time onboarding link and the
+ * welcome message; both templates use plain body variables (no buttons).
+ */
+async function sendWhatsAppBodyTemplate(to: string, templateName: string, variables: string[]): Promise<void> {
+  const version = process.env.WHATSAPP_API_VERSION ?? "v23.0";
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+  const language = process.env.WHATSAPP_LINK_TEMPLATE_LANG ?? "en";
+
+  const res = await fetch(`${GRAPH_URL}/${version}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN!}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: toWhatsAppId(to),
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: language },
+        components: [
+          {
+            type: "body",
+            parameters: variables.map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    }),
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`WhatsApp template send failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
+}
+
+/**
+ * "Complete your details" link. Set `WHATSAPP_ONBOARDING_TEMPLATE` to an
+ * approved template whose body is a single variable, e.g.
+ * "Hello, complete your Mwandi Waters details here: {{1}}".
+ */
+export const whatsappOnboardingConfigured = () =>
+  whatsappConfigured() && Boolean(process.env.WHATSAPP_ONBOARDING_TEMPLATE);
+
+export async function sendWhatsAppOnboardingLink(to: string, link: string): Promise<void> {
+  await sendWhatsAppBodyTemplate(to, process.env.WHATSAPP_ONBOARDING_TEMPLATE!, [link]);
+}
+
+/**
+ * Welcome message sent once the meter is installed. Set
+ * `WHATSAPP_WELCOME_TEMPLATE` to a template with {{1}} the first name and
+ * {{2}} the account number.
+ */
+export const whatsappWelcomeConfigured = () =>
+  whatsappConfigured() && Boolean(process.env.WHATSAPP_WELCOME_TEMPLATE);
+
+export async function sendWhatsAppWelcome(to: string, firstName: string, accountNumber: string): Promise<void> {
+  await sendWhatsAppBodyTemplate(to, process.env.WHATSAPP_WELCOME_TEMPLATE!, [firstName, accountNumber]);
+}
